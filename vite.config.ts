@@ -16,6 +16,12 @@ export default defineConfig({
                 bunny('Instrument Sans', {
                     weights: [400, 500, 600],
                 }),
+                // Fonts available inside the banner editor. Keep this list
+                // in sync with config/banner.php.
+                ...['Inter', 'Poppins', 'Montserrat', 'Playfair Display'].map(
+                    (family) =>
+                        bunny(family, { weights: [400, 700], preload: false }),
+                ),
             ],
         }),
         inertia(),
@@ -65,9 +71,11 @@ export default defineConfig({
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
             '.github/**',
+            'ai-banner-generator-prd-mvp.md',
             'composer.json',
             'resources/js/components/ui/*',
             'resources/views/mail/*',
+            'tampilan.html',
         ],
         sortTailwindcss: {
             functions: ['clsx', 'cn', 'cva'],

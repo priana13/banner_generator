@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="id">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>BannerAI — Editor Demo</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            body {
+                font-family: Inter, sans-serif;
+            }
+            .tool.active {
+                background: #fff7ed;
+                color: #ea580c;
+                border-color: #fed7aa;
+            }
+            #stage {
+                max-width: 100%;
+                box-shadow: 0 16px 55px #1725541c;
+            }
+            .checker {
+                background-image:
+                    linear-gradient(45deg, #e9edf3 25%, transparent 25%),
+                    linear-gradient(-45deg, #e9edf3 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #e9edf3 75%),
+                    linear-gradient(-45deg, transparent 75%, #e9edf3 75%);
+                background-size: 20px 20px;
+                background-position:
+                    0 0,
+                    0 10px,
+                    10px -10px,
+                    -10px 0;
+            }
+            .side-scroll {
+                scrollbar-width: thin;
+            }
+        </style>
+    </head>
+    <body class="min-h-screen bg-slate-100 text-slate-800">
+        <header
+            class="flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5"
+        >
+            <div class="flex items-center gap-3">
+                <div
+                    class="grid h-10 w-10 place-items-center rounded-xl bg-orange-500 text-xl font-extrabold text-white"
+                >
+                    B
+                </div>
+                <div>
+                    <div class="text-lg font-extrabold tracking-tight">
+                        Banner<span class="text-orange-500">AI</span>
+                    </div>
+                    <div class="-mt-1 text-[10px] text-slate-400">
+                        AI Design Studio
+                    </div>
+                </div>
+                <span class="mx-2 hidden h-7 border-l md:block"></span
+                ><input
+                    id="projectName"
+                    value="Tebar Pangan untuk Santri"
+                    class="hidden w-64 bg-transparent text-sm font-semibold outline-none md:block"
+                />
+            </div>
+            <div class="flex items-center gap-2">
+                <span
+                    id="saveStatus"
+                    class="hidden text-xs text-slate-400 sm:block"
+                    >Belum disimpan</span
+                ><button
+                    id="saveBtn"
+                    class="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+                >
+                    Simpan JSON</button
+                ><button
+                    id="exportBtn"
+                    class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600"
+                >
+                    ↓ Export PNG
+                </button>
+            </div>
+        </header>
+        <div class="flex h-[calc(100vh-64px)] min-h-[650px] overflow-hidden">
+            <aside
+                class="side-scroll flex w-[310px] shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white"
+            >
+                <div class="border-b p-5">
+                    <div class="mb-1 flex items-center gap-2">
+                        <span class="text-orange-500">✦</span>
+                        <h2 class="font-bold">AI Banner Generator</h2>
+                    </div>
+                    <p class="mb-4 text-xs text-slate-500">
+                        Jelaskan banner yang ingin Anda buat.
+                    </p>
+                    <textarea
+                        id="prompt"
+                        rows="5"
+                        class="w-full resize-none rounded-xl border p-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
+                        placeholder="Contoh: Banner donasi tebar pangan santri, warna oranye, foto santri di sebelah kanan..."
+                    >
+Banner website program Tebar Pangan untuk Santri Penghafal Quran, warna oranye dan putih, headline menarik dan tombol Donasi Sekarang.</textarea>
+                    <div class="mt-4">
+                        <label class="text-xs font-semibold text-slate-600"
+                            >Ukuran canvas</label
+                        ><select
+                            id="size"
+                            class="mt-2 w-full rounded-lg border p-2 text-sm"
+                        >
+                            <option value="1200x400">
+                                Website Hero — 1200 × 400
+                            </option>
+                            <option value="1920x600">
+                                Wide Hero — 1920 × 600
+                            </option>
+                            <option value="1080x1080">
+                                Square — 1080 × 1080
+                            </option>
+                            <option value="1080x1350">
+                                Portrait — 1080 × 1350
+                            </option>
+                        </select>
+                    </div>
+                    <div class="mt-4">
+                        <label class="text-xs font-semibold text-slate-600"
+                            >Warna utama</label
+                        >
+                        <div class="mt-2 flex gap-2" id="colors">
+                            <button
+                                data-color="#f97316"
+                                class="colorChoice h-8 w-8 rounded-full bg-orange-500 ring-2 ring-orange-500 ring-offset-2"
+                                title="Oranye"
+                            ></button
+                            ><button
+                                data-color="#16a34a"
+                                class="colorChoice h-8 w-8 rounded-full bg-green-600"
+                                title="Hijau"
+                            ></button
+                            ><button
+                                data-color="#2563eb"
+                                class="colorChoice h-8 w-8 rounded-full bg-blue-600"
+                                title="Biru"
+                            ></button
+                            ><button
+                                data-color="#7c3aed"
+                                class="colorChoice h-8 w-8 rounded-full bg-violet-600"
+                                title="Ungu"
+                            ></button
+                            ><input
+                                id="customColor"
+                                type="color"
+                                value="#f97316"
+                                title="Pilih warna"
+                                class="h-8 w-9 cursor-pointer rounded"
+                            />
+                        </div>
+                    </div>
+                    <button
+                        id="generateBtn"
+                        class="mt-5 w-full rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 py-3 font-bold text-white shadow-sm hover:brightness-95"
+                    >
+                        ✦ Generate Konsep Banner
+                    </button>
+                    <p class="mt-2 text-[11px] text-slate-400">
+                        Demo lokal: menyusun layout dari prompt. Tidak memanggil
+                        API AI.
+                    </p>
+                </div>
+                <div class="border-b p-5">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h3 class="text-sm font-bold">Tambahkan elemen</h3>
+                        <span class="text-xs text-slate-400">Editable</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button
+                            id="addText"
+                            class="tool rounded-xl border p-3 text-sm hover:bg-slate-50"
+                        >
+                            T＋
+                            <span class="mt-1 block text-xs">Teks</span></button
+                        ><button
+                            id="addRect"
+                            class="tool rounded-xl border p-3 text-sm hover:bg-slate-50"
+                        >
+                            ▭
+                            <span class="mt-1 block text-xs"
+                                >Bentuk</span
+                            ></button
+                        ><button
+                            id="addCircle"
+                            class="tool rounded-xl border p-3 text-sm hover:bg-slate-50"
+                        >
+                            ◯
+                            <span class="mt-1 block text-xs"
+                                >Lingkaran</span
+                            ></button
+                        ><label
+                            class="tool cursor-pointer rounded-xl border p-3 text-center text-sm hover:bg-slate-50"
+                            >▧
+                            <span class="mt-1 block text-xs">Upload Foto</span
+                            ><input
+                                id="upload"
+                                type="file"
+                                accept="image/*"
+                                class="hidden"
+                        /></label>
+                    </div>
+                </div>
+                <div class="p-5">
+                    <div class="mb-3 flex justify-between">
+                        <h3 class="text-sm font-bold">Layer</h3>
+                        <button
+                            id="delete"
+                            class="text-xs text-red-500 hover:underline"
+                        >
+                            Hapus terpilih
+                        </button>
+                    </div>
+                    <div id="layers" class="space-y-1 text-xs"></div>
+                </div>
+            </aside>
+            <main class="flex min-w-0 flex-1 flex-col">
+                <div
+                    class="flex h-14 items-center justify-between gap-2 border-b bg-white px-5"
+                >
+                    <div class="flex items-center gap-2">
+                        <button
+                            id="undo"
+                            class="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50"
+                            title="Undo"
+                        >
+                            ↶</button
+                        ><button
+                            id="redo"
+                            class="rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50"
+                            title="Redo"
+                        >
+                            ↷</button
+                        ><span class="hidden text-xs text-slate-400 sm:inline"
+                            >Klik objek untuk mengedit • Seret untuk
+                            memindahkan</span
+                        >
+                    </div>
+                    <div class="text-xs text-slate-500">
+                        <span id="dimensions">1200 × 400</span>
+                        <span class="ml-3" id="zoomLabel">100%</span>
+                    </div>
+                </div>
+                <div
+                    class="checker flex flex-1 items-center justify-center overflow-auto p-7"
+                    id="workArea"
+                >
+                    <div id="stage" class="relative bg-white">
+                        <canvas id="canvas" width="1200" height="400"></canvas>
+                    </div>
+                </div>
+                <div
+                    class="flex h-12 items-center justify-center gap-3 border-t bg-white text-xs text-slate-500"
+                >
+                    <button id="zoomOut" class="rounded border px-2 py-1">
+                        −</button
+                    ><input
+                        type="range"
+                        min="20"
+                        max="100"
+                        value="75"
+                        id="zoomRange"
+                        class="w-32 accent-orange-500"
+                    /><button id="zoomIn" class="rounded border px-2 py-1">
+                        ＋</button
+                    ><span id="bottomZoom">75%</span>
+                </div>
+            </main>
+            <aside
+                class="side-scroll hidden w-[275px] shrink-0 overflow-y-auto border-l bg-white lg:block"
+            >
+                <div class="border-b p-5">
+                    <h3 class="text-sm font-bold">Properti Elemen</h3>
+                    <p id="selectedType" class="mt-1 text-xs text-slate-400">
+                        Pilih objek pada canvas
+                    </p>
+                </div>
+                <div class="space-y-4 p-5">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-500"
+                            >Teks</label
+                        ><textarea
+                            id="textValue"
+                            rows="3"
+                            class="mt-1 w-full rounded-lg border p-2 text-sm"
+                            placeholder="Pilih elemen teks"
+                        ></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-500"
+                                >Ukuran font</label
+                            ><input
+                                id="fontSize"
+                                type="number"
+                                value="36"
+                                min="8"
+                                max="250"
+                                class="mt-1 w-full rounded-lg border p-2 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-500"
+                                >Warna elemen</label
+                            ><input
+                                id="elementColor"
+                                type="color"
+                                value="#f97316"
+                                class="mt-1 h-9 w-full rounded-lg border p-1"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-500"
+                            >Opasitas</label
+                        ><input
+                            id="opacity"
+                            type="range"
+                            min="0"
+                            max="100"
+                            value="100"
+                            class="w-full accent-orange-500"
+                        />
+                    </div>
+                    <div class="flex gap-2">
+                        <button
+                            id="bringForward"
+                            class="flex-1 rounded-lg border p-2 text-xs"
+                        >
+                            Ke depan ↑</button
+                        ><button
+                            id="sendBackward"
+                            class="flex-1 rounded-lg border p-2 text-xs"
+                        >
+                            Ke belakang ↓
+                        </button>
+                    </div>
+                    <div class="border-t pt-3">
+                        <p class="text-xs leading-relaxed text-slate-400">
+                            Tips: double-click teks untuk mengubahnya langsung
+                            di panel properti. Semua elemen merupakan layer
+                            terpisah.
+                        </p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+        <script>
+            const c = new fabric.Canvas('canvas', {
+                preserveObjectStacking: true,
+                selection: true,
+                backgroundColor: '#fff7ed',
+            });
+            let accent = '#f97316',
+                history = [],
+                historyIndex = -1,
+                restoring = false;
+            const $ = (id) => document.getElementById(id);
+            function record() {
+                if (restoring) return;
+                const s = JSON.stringify(c.toJSON(['name']));
+                if (history[historyIndex] === s) return;
+                history = history.slice(0, historyIndex + 1);
+                history.push(s);
+                historyIndex = history.length - 1;
+                if (history.length > 35) {
+                    history.shift();
+                    historyIndex--;
+                }
+                $('saveStatus').textContent = 'Perubahan belum diekspor';
+                refreshLayers();
+            }
+            function add(obj, name) {
+                obj.name = name;
+                c.add(obj);
+                c.setActiveObject(obj);
+                c.renderAll();
+                record();
+                return obj;
+            }
+            function rect(x, y, w, h, color, r = 0, name = 'Bentuk') {
+                return add(
+                    new fabric.Rect({
+                        left: x,
+                        top: y,
+                        width: w,
+                        height: h,
+                        fill: color,
+                        rx: r,
+                        ry: r,
+                    }),
+                    name,
+                );
+            }
+            function txt(
+                text,
+                x,
+                y,
+                w,
+                size,
+                color,
+                bold = false,
+                name = 'Teks',
+            ) {
+                return add(
+                    new fabric.Textbox(text, {
+                        left: x,
+                        top: y,
+                        width: w,
+                        fontFamily: 'Inter',
+                        fontSize: size,
+                        fontWeight: bold ? 'bold' : 'normal',
+                        fill: color,
+                        splitByGrapheme: false,
+                    }),
+                    name,
+                );
+            }
+            function setup() {
+                c.clear();
+                c.backgroundColor = '#fff7ed';
+                const w = c.width,
+                    h = c.height;
+                rect(0, 0, w * 0.63, h, '#fff7ed', 0, 'Latar krem');
+                rect(w * 0.62, 0, w * 0.38, h, accent, 0, 'Panel warna');
+                const circle = new fabric.Circle({
+                    left: w * 0.69,
+                    top: h * 0.1,
+                    radius: h * 0.37,
+                    fill: '#ffffff',
+                    opacity: 0.16,
+                });
+                add(circle, 'Dekorasi');
+                txt(
+                    'PROGRAM BERBAGI KEBAIKAN',
+                    w * 0.05,
+                    h * 0.14,
+                    w * 0.48,
+                    Math.max(12, h * 0.038),
+                    accent,
+                    true,
+                    'Label',
+                );
+                txt(
+                    'Tebar Pangan\nuntuk Santri',
+                    w * 0.05,
+                    h * 0.27,
+                    w * 0.54,
+                    Math.max(26, h * 0.105),
+                    '#172554',
+                    true,
+                    'Judul utama',
+                );
+                txt(
+                    'Bersama hadirkan pangan bergizi untuk para penghafal Al-Qur’an.',
+                    w * 0.05,
+                    h * 0.61,
+                    w * 0.48,
+                    Math.max(13, h * 0.041),
+                    '#475569',
+                    false,
+                    'Deskripsi',
+                );
+                rect(
+                    w * 0.05,
+                    h * 0.79,
+                    w * 0.21,
+                    h * 0.115,
+                    accent,
+                    12,
+                    'Tombol CTA',
+                );
+                txt(
+                    'Donasi Sekarang',
+                    w * 0.067,
+                    h * 0.817,
+                    w * 0.18,
+                    Math.max(12, h * 0.038),
+                    '#ffffff',
+                    true,
+                    'Teks CTA',
+                );
+                txt(
+                    'FOTO / ILUSTRASI\nTambahkan foto santri',
+                    w * 0.67,
+                    h * 0.39,
+                    w * 0.28,
+                    Math.max(14, h * 0.048),
+                    '#ffffff',
+                    true,
+                    'Placeholder foto',
+                );
+                c.discardActiveObject();
+                c.renderAll();
+                record();
+            }
+            function refreshLayers() {
+                const els = c.getObjects().slice().reverse();
+                $('layers').innerHTML = '';
+                els.forEach((o) => {
+                    const b = document.createElement('button');
+                    b.className =
+                        'w-full text-left p-2.5 border rounded-lg hover:bg-orange-50 flex justify-between items-center ' +
+                        (c.getActiveObject() === o
+                            ? 'border-orange-400 bg-orange-50'
+                            : 'border-slate-100');
+                    const t = document.createElement('span');
+                    t.className = 'truncate';
+                    t.textContent =
+                        (o.type === 'textbox' ? 'T  ' : '▧  ') +
+                        (o.name || o.type);
+                    const eye = document.createElement('span');
+                    eye.className = 'text-slate-400 ml-2';
+                    eye.textContent = o.visible ? '◉' : '○';
+                    b.append(t, eye);
+                    b.onclick = () => {
+                        c.setActiveObject(o);
+                        c.renderAll();
+                        refreshLayers();
+                        syncProps();
+                    };
+                    $('layers').appendChild(b);
+                });
+            }
+            function syncProps() {
+                const o = c.getActiveObject();
+                $('selectedType').textContent = o
+                    ? o.name || o.type
+                    : 'Pilih objek pada canvas';
+                $('textValue').value = o?.type === 'textbox' ? o.text : '';
+                $('textValue').disabled = o?.type !== 'textbox';
+                $('fontSize').disabled = o?.type !== 'textbox';
+                if (o?.type === 'textbox') $('fontSize').value = o.fontSize;
+                if (
+                    o?.fill &&
+                    typeof o.fill === 'string' &&
+                    /^#[0-9a-f]{6}$/i.test(o.fill)
+                )
+                    $('elementColor').value = o.fill;
+                $('opacity').value = Math.round((o?.opacity ?? 1) * 100);
+                refreshLayers();
+            }
+            c.on('selection:created', syncProps);
+            c.on('selection:updated', syncProps);
+            c.on('selection:cleared', syncProps);
+            c.on('object:modified', record);
+            c.on('text:changed', record);
+            c.on('object:added', () => {
+                if (!restoring) refreshLayers();
+            });
+            $('textValue').oninput = (e) => {
+                const o = c.getActiveObject();
+                if (o?.type === 'textbox') {
+                    o.set('text', e.target.value);
+                    c.renderAll();
+                    record();
+                }
+            };
+            $('fontSize').oninput = (e) => {
+                const o = c.getActiveObject();
+                if (o?.type === 'textbox') {
+                    o.set('fontSize', +e.target.value);
+                    c.renderAll();
+                    record();
+                }
+            };
+            $('elementColor').oninput = (e) => {
+                const o = c.getActiveObject();
+                if (o) {
+                    o.set('fill', e.target.value);
+                    c.renderAll();
+                    record();
+                }
+            };
+            $('opacity').oninput = (e) => {
+                const o = c.getActiveObject();
+                if (o) {
+                    o.set('opacity', e.target.value / 100);
+                    c.renderAll();
+                    record();
+                }
+            };
+            $('addText').onclick = () =>
+                txt(
+                    'Teks baru',
+                    100,
+                    100,
+                    350,
+                    40,
+                    '#172554',
+                    true,
+                    'Teks baru',
+                );
+            $('addRect').onclick = () =>
+                rect(150, 150, 220, 100, accent, 12, 'Bentuk baru');
+            $('addCircle').onclick = () =>
+                add(
+                    new fabric.Circle({
+                        left: 200,
+                        top: 100,
+                        radius: 60,
+                        fill: accent,
+                    }),
+                    'Lingkaran',
+                );
+            $('delete').onclick = () => {
+                c.getActiveObjects().forEach((o) => c.remove(o));
+                c.discardActiveObject();
+                c.renderAll();
+                record();
+                syncProps();
+            };
+            $('bringForward').onclick = () => {
+                const o = c.getActiveObject();
+                if (o) {
+                    c.bringForward(o);
+                    c.renderAll();
+                    record();
+                }
+            };
+            $('sendBackward').onclick = () => {
+                const o = c.getActiveObject();
+                if (o) {
+                    c.sendBackwards(o);
+                    c.renderAll();
+                    record();
+                }
+            };
+            $('upload').onchange = (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = () =>
+                    fabric.Image.fromURL(reader.result, (img) => {
+                        img.scaleToWidth(Math.min(c.width * 0.35, 420));
+                        img.set({ left: c.width * 0.65, top: c.height * 0.13 });
+                        add(img, 'Foto: ' + f.name);
+                    });
+                reader.readAsDataURL(f);
+                e.target.value = '';
+            };
+            function restore(idx) {
+                if (idx < 0 || idx >= history.length) return;
+                restoring = true;
+                historyIndex = idx;
+                c.loadFromJSON(history[idx], () => {
+                    c.renderAll();
+                    restoring = false;
+                    syncProps();
+                });
+            }
+            $('undo').onclick = () => restore(historyIndex - 1);
+            $('redo').onclick = () => restore(historyIndex + 1);
+            function setZoom(p) {
+                const z = p / 100;
+                c.setZoom(z);
+                c.setWidth(c.originalWidth * z);
+                c.setHeight(c.originalHeight * z);
+                c.renderAll();
+                $('bottomZoom').textContent = p + '%';
+                $('zoomLabel').textContent = p + '%';
+                $('zoomRange').value = p;
+            }
+            function resizeCanvas(w, h) {
+                c.setZoom(1);
+                c.setDimensions({ width: w, height: h });
+                c.originalWidth = w;
+                c.originalHeight = h;
+                const max = Math.min(
+                    100,
+                    Math.floor((($('workArea').clientWidth - 60) / w) * 100),
+                );
+                setZoom(Math.max(20, max));
+                $('dimensions').textContent = w + ' × ' + h;
+            }
+            $('zoomRange').oninput = (e) => setZoom(+e.target.value);
+            $('zoomIn').onclick = () =>
+                setZoom(Math.min(100, +$('zoomRange').value + 10));
+            $('zoomOut').onclick = () =>
+                setZoom(Math.max(20, +$('zoomRange').value - 10));
+            $('size').onchange = (e) => {
+                const [w, h] = e.target.value.split('x').map(Number);
+                resizeCanvas(w, h);
+                setup();
+            };
+            document.querySelectorAll('.colorChoice').forEach(
+                (b) =>
+                    (b.onclick = () => {
+                        accent = b.dataset.color;
+                        document
+                            .querySelectorAll('.colorChoice')
+                            .forEach((x) =>
+                                x.classList.remove(
+                                    'ring-2',
+                                    'ring-offset-2',
+                                    'ring-orange-500',
+                                ),
+                            );
+                        b.classList.add(
+                            'ring-2',
+                            'ring-offset-2',
+                            'ring-orange-500',
+                        );
+                        $('customColor').value = accent;
+                    }),
+            );
+            $('customColor').oninput = (e) => (accent = e.target.value);
+            $('generateBtn').onclick = () => {
+                const prompt = $('prompt').value.trim();
+                if (!prompt) return alert('Masukkan deskripsi banner.');
+                setup();
+                const words =
+                    prompt.match(
+                        /(?:tebar pangan|santri|sekolah|masjid|donasi|pendidikan)/gi,
+                    ) || [];
+                const heading = c
+                    .getObjects()
+                    .find((o) => o.name === 'Judul utama');
+                if (heading) {
+                    heading.text = words.some((w) => /masjid/i.test(w))
+                        ? 'Bangun Masjid\nBersama Kita'
+                        : words.some((w) => /pendidikan|sekolah/i.test(w))
+                          ? 'Dukung Pendidikan\nGenerasi Bangsa'
+                          : 'Tebar Pangan\nuntuk Santri';
+                }
+                const panel = c
+                    .getObjects()
+                    .find((o) => o.name === 'Panel warna');
+                if (panel) panel.set('fill', accent);
+                const btn = c.getObjects().find((o) => o.name === 'Tombol CTA');
+                if (btn) btn.set('fill', accent);
+                const label = c.getObjects().find((o) => o.name === 'Label');
+                if (label) label.set('fill', accent);
+                c.renderAll();
+                record();
+                alert(
+                    'Konsep banner demo dibuat! Untuk hasil AI sesungguhnya, sambungkan endpoint LLM dan image generation.',
+                );
+            };
+            $('saveBtn').onclick = () => {
+                const data = {
+                    name: $('projectName').value,
+                    canvas: {
+                        width: c.originalWidth,
+                        height: c.originalHeight,
+                    },
+                    design: c.toJSON(['name']),
+                };
+                download(
+                    new Blob([JSON.stringify(data, null, 2)], {
+                        type: 'application/json',
+                    }),
+                    'banner-design.json',
+                );
+                $('saveStatus').textContent = 'JSON berhasil diunduh';
+            };
+            function download(blob, name) {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            }
+            $('exportBtn').onclick = () => {
+                c.discardActiveObject();
+                c.renderAll();
+                const z = c.getZoom();
+                c.setZoom(1);
+                c.setDimensions({
+                    width: c.originalWidth,
+                    height: c.originalHeight,
+                });
+                const url = c.toDataURL({ format: 'png', multiplier: 1 });
+                setZoom(Math.round(z * 100));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'banner-ai.png';
+                a.click();
+            };
+            document.addEventListener('keydown', (e) => {
+                if (
+                    ['INPUT', 'TEXTAREA'].includes(
+                        document.activeElement?.tagName,
+                    )
+                )
+                    return;
+                if (
+                    (e.key === 'Delete' || e.key === 'Backspace') &&
+                    c.getActiveObjects().length
+                ) {
+                    e.preventDefault();
+                    $('delete').click();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                    e.preventDefault();
+                    e.shiftKey ? $('redo').click() : $('undo').click();
+                }
+            });
+            c.originalWidth = 1200;
+            c.originalHeight = 400;
+            setup();
+            setTimeout(
+                () =>
+                    setZoom(
+                        Math.min(
+                            100,
+                            Math.max(
+                                20,
+                                Math.floor(
+                                    (($('workArea').clientWidth - 60) / 1200) *
+                                        100,
+                                ),
+                            ),
+                        ),
+                    ),
+                100,
+            );
+        </script>
+    </body>
+</html>

@@ -2,9 +2,18 @@
 
 namespace App\Providers;
 
+use App\Services\Ai\Contracts\ImageProvider;
+use App\Services\Ai\Contracts\LayoutProvider;
+use App\Services\Ai\Providers\LocalImageProvider;
+use App\Services\Ai\Providers\LocalLayoutProvider;
+use App\Services\Ai\Providers\OpenAiImageProvider;
+use App\Services\Ai\Providers\OpenAiLayoutProvider;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -15,7 +24,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LayoutProvider::class, fn (): LayoutProvider => match (config('banner.layout_provider')) {
+            'openai' => new OpenAiLayoutProvider,
+            default => new LocalLayoutProvider,
+        });
+
+        $this->app->bind(ImageProvider::class, fn (): ImageProvider => match (config('banner.image_provider')) {
+            'openai' => new OpenAiImageProvider,
+            default => new LocalImageProvider,
+        });
     }
 
     /**
@@ -24,6 +41,17 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureRateLimiting();
+    }
+
+    /**
+     * Limit how often a user may start (or retry) an AI generation.
+     */
+    protected function configureRateLimiting(): void
+    {
+        RateLimiter::for('generate', fn (Request $request) => Limit::perMinute(
+            config()->integer('banner.generations_per_minute'),
+        )->by($request->user()?->id ?: $request->ip()));
     }
 
     /**

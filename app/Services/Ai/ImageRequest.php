@@ -1,0 +1,18 @@
+<?php
+
+namespace App\Services\Ai;
+
+final readonly class ImageRequest
+{
+    public const PURPOSE_BACKGROUND = 'background';
+
+    public const PURPOSE_VISUAL = 'visual';
+
+    public function __construct(
+        public string $prompt,
+        public int $width,
+        public int $height,
+        public string $accentColor,
+        public string $purpose,
+    ) {}
+}

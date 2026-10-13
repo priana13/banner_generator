@@ -13,6 +13,8 @@ void createInertiaApp({
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
+            // The banner editor is a full-screen workspace.
+            case name === 'projects/editor':
                 return null;
             case name.startsWith('auth/'):
                 return AuthLayout;

@@ -1,0 +1,125 @@
+import type { CSSProperties } from 'react';
+import type { DesignDocument, DesignElement, EditorAsset } from '@/types';
+
+function PreviewElement({
+    element,
+    assets,
+}: {
+    element: DesignElement;
+    assets: EditorAsset[];
+}) {
+    const box = {
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+    };
+    const text: CSSProperties = {
+        fontFamily: `"${'fontFamily' in element ? element.fontFamily : 'Inter'}", sans-serif`,
+        fontSize: 'fontSize' in element ? element.fontSize : undefined,
+        fontWeight:
+            'fontStyle' in element && element.fontStyle === 'bold' ? 700 : 400,
+        lineHeight: 1.2,
+    };
+
+    switch (element.type) {
+        case 'rect':
+            return (
+                <rect {...box} rx={element.cornerRadius} fill={element.fill} />
+            );
+        case 'circle':
+            return (
+                <ellipse
+                    cx={element.x + element.width / 2}
+                    cy={element.y + element.height / 2}
+                    rx={element.width / 2}
+                    ry={element.height / 2}
+                    fill={element.fill}
+                />
+            );
+        case 'image': {
+            const asset = assets.find((item) => item.id === element.assetId);
+
+            return asset ? (
+                <image {...box} href={asset.url} preserveAspectRatio="none" />
+            ) : null;
+        }
+        case 'text':
+            return (
+                <foreignObject {...box} height={element.height * 4}>
+                    <div
+                        style={{
+                            ...text,
+                            color: element.fill,
+                            textAlign: element.align,
+                            whiteSpace: 'pre-wrap',
+                        }}
+                    >
+                        {element.text}
+                    </div>
+                </foreignObject>
+            );
+        case 'button':
+            return (
+                <foreignObject {...box}>
+                    <div
+                        style={{
+                            ...text,
+                            display: 'grid',
+                            placeItems: 'center',
+                            height: '100%',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                            color: element.textColor,
+                            backgroundColor: element.fill,
+                            borderRadius: element.cornerRadius,
+                        }}
+                    >
+                        {element.text}
+                    </div>
+                </foreignObject>
+            );
+    }
+}
+
+/**
+ * A lightweight, non-interactive rendering of a design document, used for
+ * thumbnails. The editor itself renders with Konva.
+ */
+export function DocumentPreview({
+    document,
+    assets,
+    className,
+}: {
+    document: DesignDocument;
+    assets: EditorAsset[];
+    className?: string;
+}) {
+    const { canvas, elements } = document;
+
+    return (
+        <svg
+            viewBox={`0 0 ${canvas.width} ${canvas.height}`}
+            className={className}
+            role="img"
+            aria-label="Pratinjau banner"
+        >
+            <rect
+                width={canvas.width}
+                height={canvas.height}
+                fill={canvas.backgroundColor}
+            />
+            {elements
+                .filter((element) => element.visible)
+                .map((element) => (
+                    <g
+                        key={element.id}
+                        opacity={element.opacity}
+                        transform={`rotate(${element.rotation} ${element.x} ${element.y})`}
+                    >
+                        <PreviewElement element={element} assets={assets} />
+                    </g>
+                ))}
+        </svg>
+    );
+}
