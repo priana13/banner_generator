@@ -36,7 +36,7 @@ class OpenAiImageProvider implements ImageProvider
             $response = Http::withToken($apiKey)
                 ->timeout(config()->integer('banner.openai.timeout'))
                 ->acceptJson()
-                ->post(config()->string('banner.openai.base_url').'/images/generations', [
+                ->post(rtrim(config()->string('banner.openai.base_url'), '/').'/images/generations', [
                     'model' => $this->model(),
                     'prompt' => $this->prompt($request),
                     'size' => match (true) {

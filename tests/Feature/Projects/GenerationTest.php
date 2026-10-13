@@ -272,3 +272,33 @@ test('a missing api key fails the job with a clear message', function () {
 
     expect(GenerationJob::sole()->error_message)->toContain('OPENAI_API_KEY');
 });
+
+test('openai-compatible routers without structured output still work', function () {
+    config([
+        'banner.layout_provider' => 'openai',
+        'banner.openai.api_key' => 'sk-router',
+        'banner.openai.base_url' => 'https://router.test/v1/',
+        'banner.openai.layout_model' => 'cc/some-model',
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://router.test/v1/chat/completions' => Http::sequence()
+            ->push(['error' => ['message' => 'response_format is not supported']], 400)
+            ->push(['choices' => [['message' => [
+                'content' => "Berikut hasilnya:\n```json\n{\"headline\": \"Tebar Pangan\", \"cta\": \"Donasi\", \"layout\": \"visual-left\"}\n```",
+            ]]]]),
+    ]);
+
+    $this->postJson(route('api.projects.generate', $this->project), $this->brief)
+        ->assertAccepted()
+        ->assertJsonPath('status', 'succeeded');
+
+    $elements = collect($this->project->refresh()->currentRevision->document_json['elements']);
+
+    expect($elements->firstWhere('name', 'Judul utama')['text'])->toBe('Tebar Pangan')
+        ->and($elements->firstWhere('name', 'Visual AI')['x'])->toBe(0);
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn ($request) => $request['model'] === 'cc/some-model' && ! isset($request['response_format']));
+});

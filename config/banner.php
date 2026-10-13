@@ -20,7 +20,7 @@ return [
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-        'layout_model' => env('OPENAI_LAYOUT_MODEL', 'gpt-4o-mini'),
+        'layout_model' => (string) env('OPENAI_LAYOUT_MODEL', 'gpt-4o-mini'),
         'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1'),
         'timeout' => (int) env('OPENAI_TIMEOUT', 90),
 
