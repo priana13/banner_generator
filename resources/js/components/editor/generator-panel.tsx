@@ -11,10 +11,12 @@ import type { EditorAsset } from '@/types';
 
 type Generation = {
     busy: boolean;
+    queued: boolean;
     failed: boolean;
     error: string | null;
     start: (brief: GenerationBrief) => Promise<void>;
     retry: () => Promise<void>;
+    cancel: () => Promise<void>;
 };
 
 function BriefUpload({

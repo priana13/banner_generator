@@ -359,9 +359,27 @@ export default function Editor({
                         </div>
                         {generation.busy && (
                             <div className="absolute inset-0 grid place-items-center bg-white/70 backdrop-blur-[1px]">
-                                <div className="flex items-center gap-3 rounded-xl bg-white px-5 py-4 text-sm font-semibold shadow-lg">
-                                    <LoaderCircle className="size-5 animate-spin text-orange-500" />
-                                    AI sedang menyusun banner Anda…
+                                <div className="max-w-sm rounded-xl bg-white px-5 py-4 text-sm shadow-lg">
+                                    <div className="flex items-center gap-3 font-semibold">
+                                        <LoaderCircle className="size-5 shrink-0 animate-spin text-orange-500" />
+                                        {generation.queued
+                                            ? 'Menunggu antrean…'
+                                            : 'AI sedang menyusun banner Anda…'}
+                                    </div>
+                                    {generation.queued && (
+                                        <p className="mt-2 text-xs text-slate-500">
+                                            Jika ini berlangsung lama, queue
+                                            worker di server kemungkinan belum
+                                            berjalan.
+                                        </p>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => void generation.cancel()}
+                                        className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50"
+                                    >
+                                        Batalkan
+                                    </button>
                                 </div>
                             </div>
                         )}

@@ -8,6 +8,7 @@ enum GenerationStatus: string
     case Running = 'running';
     case Succeeded = 'succeeded';
     case Failed = 'failed';
+    case Cancelled = 'cancelled';
 
     public function isActive(): bool
     {

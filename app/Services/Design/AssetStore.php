@@ -26,6 +26,12 @@ class AssetStore
         ]);
     }
 
+    public function delete(Asset $asset): void
+    {
+        $this->disk()->delete($asset->storage_key);
+        $asset->delete();
+    }
+
     /**
      * Persist image bytes as a project asset. The MIME type and dimensions
      * are read from the bytes themselves, never from client-supplied data.

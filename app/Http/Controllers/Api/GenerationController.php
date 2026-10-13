@@ -75,6 +75,26 @@ class GenerationController extends Controller
     }
 
     /**
+     * Cancel a job that is still queued or running. A worker that already
+     * picked it up discards its result instead of replacing the design.
+     */
+    public function cancel(GenerationJob $generationJob): JsonResponse
+    {
+        Gate::authorize('update', $generationJob->project);
+
+        if ($generationJob->status->isActive()) {
+            $generationJob->update([
+                'status' => GenerationStatus::Cancelled,
+                'finished_at' => now(),
+            ]);
+
+            $generationJob->project->update(['status' => ProjectStatus::Ready]);
+        }
+
+        return response()->json($generationJob->toStatusArray());
+    }
+
+    /**
      * Re-run a failed job in place. No new project or job is created.
      */
     public function retry(GenerationJob $generationJob): JsonResponse

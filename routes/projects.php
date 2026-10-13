@@ -29,6 +29,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('throttle:generate')
             ->name('projects.generate');
         Route::get('generation-jobs/{generationJob}', [GenerationController::class, 'show'])->name('generation-jobs.show');
+        Route::post('generation-jobs/{generationJob}/cancel', [GenerationController::class, 'cancel'])->name('generation-jobs.cancel');
         Route::post('generation-jobs/{generationJob}/retry', [GenerationController::class, 'retry'])
             ->middleware('throttle:generate')
             ->name('generation-jobs.retry');

@@ -88,7 +88,7 @@ export type EditorAsset = {
 export type GenerationJob = {
     id: number;
     project_id: number;
-    status: 'queued' | 'running' | 'succeeded' | 'failed';
+    status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
     error_message: string | null;
     provider: string;
     attempts: number;

@@ -1,12 +1,12 @@
 domains:
-  - banner_generator
-php_version: "8.5"
-node_version: "22"
+    - banner_generator
+php_version: '8.5'
+node_version: '22'
 framework: laravel
-framework_version: "13"
+framework_version: '13'
 secured: true
 services:
-  - mariadb-11-8:
-      preset: mariadb
-      version: "11.8"
-  - redis
+    - mariadb-11-8:
+          preset: mariadb
+          version: '11.8'
+    - redis

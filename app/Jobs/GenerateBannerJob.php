@@ -109,6 +109,14 @@ class GenerateBannerJob implements ShouldQueue
             logo: $logo,
         );
 
+        // The user may have cancelled while the providers were working: the
+        // current design must then stay exactly as it is.
+        if ($job->refresh()->status !== GenerationStatus::Running) {
+            $assets->delete($generated);
+
+            return;
+        }
+
         DB::transaction(function () use ($documents, $project, $document, $job, $spec, $generated, $layout, $image): void {
             $revision = $documents->commit($project, $document, $job->user_id);
 
@@ -130,7 +138,7 @@ class GenerateBannerJob implements ShouldQueue
     {
         $job = GenerationJob::with('project')->find($this->generationJobId);
 
-        if ($job === null) {
+        if ($job === null || $job->status === GenerationStatus::Cancelled) {
             return;
         }
 

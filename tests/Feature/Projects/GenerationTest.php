@@ -302,3 +302,56 @@ test('openai-compatible routers without structured output still work', function 
     Http::assertSentCount(2);
     Http::assertSent(fn ($request) => $request['model'] === 'cc/some-model' && ! isset($request['response_format']));
 });
+
+test('a queued job can be cancelled and is then skipped by the worker', function () {
+    Queue::fake();
+
+    $id = $this->postJson(route('api.projects.generate', $this->project), $this->brief)->assertAccepted()->json('id');
+
+    $this->postJson(route('api.generation-jobs.cancel', $id))
+        ->assertOk()
+        ->assertJsonPath('status', 'cancelled');
+
+    expect($this->project->refresh()->status)->toBe(ProjectStatus::Ready);
+
+    // The worker eventually reaches the queued job: it must do nothing.
+    app()->call([new GenerateBannerJob($id), 'handle']);
+
+    expect(GenerationJob::sole()->status)->toBe(GenerationStatus::Cancelled)
+        ->and($this->project->revisions()->count())->toBe(1)
+        ->and($this->project->assets()->count())->toBe(0);
+
+    // A cancelled job no longer blocks a new generation.
+    $this->postJson(route('api.projects.generate', $this->project), $this->brief)
+        ->assertAccepted()
+        ->assertJsonPath('status', 'queued');
+});
+
+test('cancelling while the provider is working discards the result', function () {
+    Queue::fake();
+
+    $id = $this->postJson(route('api.projects.generate', $this->project), $this->brief)->json('id');
+
+    fakeLayout(function () use ($id) {
+        $this->postJson(route('api.generation-jobs.cancel', $id))->assertJsonPath('status', 'cancelled');
+
+        return new LayoutResult(['headline' => 'Terlambat', 'cta' => 'Donasi']);
+    });
+
+    app()->call([new GenerateBannerJob($id), 'handle']);
+
+    expect(GenerationJob::sole()->status)->toBe(GenerationStatus::Cancelled)
+        ->and($this->project->revisions()->count())->toBe(1)
+        ->and($this->project->assets()->count())->toBe(0)
+        ->and(Storage::disk('local')->allFiles())->toBe([]);
+});
+
+test('finished jobs cannot be cancelled and other users cannot cancel', function () {
+    $id = $this->postJson(route('api.projects.generate', $this->project), $this->brief)->json('id');
+
+    $this->postJson(route('api.generation-jobs.cancel', $id))->assertJsonPath('status', 'succeeded');
+
+    $this->actingAs(User::factory()->create())
+        ->postJson(route('api.generation-jobs.cancel', $id))
+        ->assertForbidden();
+});

@@ -5,6 +5,7 @@ import { uid } from '@/lib/editor-elements';
 import { saveDocument } from '@/lib/editor-persistence';
 import { useEditorStore } from '@/lib/editor-store';
 import {
+    cancel as cancelRoute,
     retry as retryRoute,
     show as jobRoute,
 } from '@/routes/api/generation-jobs';
@@ -33,7 +34,9 @@ export function useGeneration(
 ) {
     // A job that finished before the page was opened needs no attention.
     const [job, setJob] = useState<GenerationJob | null>(
-        initialJob?.status === 'succeeded' ? null : initialJob,
+        initialJob?.status === 'succeeded' || initialJob?.status === 'cancelled'
+            ? null
+            : initialJob,
     );
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -129,8 +132,30 @@ export function useGeneration(
     const retry = (): Promise<void> =>
         run(() => api<GenerationJob>(retryRoute(job?.id ?? 0)));
 
+    const cancel = async (): Promise<void> => {
+        if (!job || !polling) {
+            return;
+        }
+
+        try {
+            const latest = await api<GenerationJob>(cancelRoute(job.id));
+
+            // It may have finished a moment before the request arrived;
+            // polling then picks up the result as usual.
+            if (latest.status === 'cancelled') {
+                setJob(null);
+                toast.info('Generate dibatalkan.');
+            }
+        } catch (caught) {
+            toast.error(errorMessage(caught));
+        }
+    };
+
     return {
         busy: starting || polling,
+        /** Waiting for a queue worker to pick the job up. */
+        queued: job?.status === 'queued',
+        cancel,
         failed: job?.status === 'failed',
         error: error ?? (job?.status === 'failed' ? job.error_message : null),
         start,
