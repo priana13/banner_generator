@@ -495,3 +495,40 @@ test('Gemini-generated images are stored as private banner assets', function () 
     expect(collect($document['elements'])->firstWhere('name', 'Visual AI')['assetId'])->toBe($asset->id)
         ->and(json_encode($document))->not->toContain('gemini-secret');
 });
+
+test('deepseek layouts use json object output without an unsupported schema', function () {
+    config([
+        'banner.layout_provider' => 'openai',
+        'banner.openai.api_key' => 'test-secret',
+        'banner.openai.base_url' => 'https://api.deepseek.com/v1/',
+        'banner.openai.layout_model' => 'deepseek-flash',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake(['api.deepseek.com/*' => Http::response([
+        'choices' => [['message' => ['content' => '{"headline":"Tebar Pangan","cta":"Donasi","layout":"visual-right"}']]],
+    ])]);
+
+    $this->postJson(route('api.projects.generate', $this->project), $this->brief)
+        ->assertAccepted()->assertJsonPath('status', 'succeeded');
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request) => $request['response_format'] === ['type' => 'json_object']
+        && $request['model'] === 'deepseek-flash');
+});
+
+test('unsupported deepseek models produce actionable errors without leaking provider responses', function () {
+    config([
+        'banner.layout_provider' => 'openai',
+        'banner.openai.api_key' => 'test-secret',
+        'banner.openai.base_url' => 'https://api.deepseek.com',
+        'banner.openai.layout_model' => 'Janus-Pro-7B',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake(['api.deepseek.com/*' => Http::response(['error' => [
+        'message' => 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed Janus-Pro-7B. test-secret',
+    ]], 400)]);
+
+    $this->postJson(route('api.projects.generate', $this->project), $this->brief)->assertServerError();
+    expect(GenerationJob::sole()->error_message)
+        ->toContain('deepseek-flash')->not->toContain('test-secret');
+});

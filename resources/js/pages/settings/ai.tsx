@@ -1,6 +1,8 @@
 import { Head, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import AiModelCatalog from '@/components/settings/ai-model-catalog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +20,7 @@ type Settings = {
 };
 
 export default function Ai({ settings }: { settings: Settings }) {
+    const [catalogVersion, setCatalogVersion] = useState(0);
     const form = useForm({
         layout_provider: settings.layout_provider,
         image_provider: settings.image_provider,
@@ -54,8 +57,10 @@ export default function Ai({ settings }: { settings: Settings }) {
                         event.preventDefault();
                         form.put('/settings/ai', {
                             preserveScroll: true,
-                            onSuccess: () =>
-                                form.reset('gemini_api_key', 'openai_api_key'),
+                            onSuccess: () => {
+                                form.reset('gemini_api_key', 'openai_api_key');
+                                setCatalogVersion((version) => version + 1);
+                            },
                         });
                     }}
                 >
@@ -142,6 +147,48 @@ export default function Ai({ settings }: { settings: Settings }) {
                     >
                         Dapatkan API key di Google AI Studio
                     </a>
+                    <div className="space-y-3">
+                        <h2 className="font-medium">Model yang tersedia</h2>
+                        <p className="text-sm text-muted-foreground">
+                            Daftar diambil langsung menggunakan API key dan Base
+                            URL yang sudah tersimpan. Jika baru mengubah
+                            keduanya, simpan konfigurasi terlebih dahulu. Pilih
+                            model untuk mengisi kolom model dan provider, lalu
+                            simpan untuk menerapkannya.
+                        </p>
+                        {(['gemini', 'openai'] as const).map((provider) => (
+                            <AiModelCatalog
+                                key={`${provider}-${catalogVersion}`}
+                                provider={provider}
+                                configured={
+                                    settings[`${provider}_api_key_configured`]
+                                }
+                                onSelect={(kind, id) => {
+                                    if (provider === 'gemini') {
+                                        form.setData(
+                                            kind === 'layout'
+                                                ? 'gemini_model'
+                                                : 'gemini_image_model',
+                                            id,
+                                        );
+                                    } else {
+                                        form.setData(
+                                            kind === 'layout'
+                                                ? 'openai_layout_model'
+                                                : 'openai_image_model',
+                                            id,
+                                        );
+                                    }
+                                    form.setData(
+                                        kind === 'layout'
+                                            ? 'layout_provider'
+                                            : 'image_provider',
+                                        provider,
+                                    );
+                                }}
+                            />
+                        ))}
+                    </div>
                     <div>
                         <Button disabled={form.processing}>
                             Simpan konfigurasi global

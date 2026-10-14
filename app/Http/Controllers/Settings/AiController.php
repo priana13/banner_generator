@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiSetting;
+use App\Services\Ai\AiProviderException;
 use App\Services\Ai\GlobalAiSettings;
+use App\Services\Ai\ModelCatalog;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +18,19 @@ use Inertia\Response;
 
 class AiController extends Controller
 {
+    public function models(Request $request, GlobalAiSettings $settings, ModelCatalog $catalog): JsonResponse
+    {
+        $data = $request->validate(['provider' => ['required', Rule::in(['gemini', 'openai'])]]);
+
+        try {
+            return response()->json($catalog->list($data['provider'], $settings->values()))
+                ->header('Cache-Control', 'no-store');
+        } catch (AiProviderException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422)
+                ->header('Cache-Control', 'no-store');
+        }
+    }
+
     public function edit(GlobalAiSettings $settings): Response
     {
         $values = $settings->values();

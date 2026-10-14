@@ -10,6 +10,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings', fn () => redirect('/settings/profile'));
 
     Route::get('settings/ai', [AiController::class, 'edit'])->name('ai.edit');
+    Route::post('settings/ai/models', [AiController::class, 'models'])->middleware('throttle:12,1')->name('ai.models');
     Route::put('settings/ai', [AiController::class, 'update'])->middleware('throttle:6,1')->name('ai.update');
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');

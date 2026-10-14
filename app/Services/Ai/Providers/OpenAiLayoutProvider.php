@@ -49,6 +49,11 @@ class OpenAiLayoutProvider implements LayoutProvider
             ],
         ];
 
+        $deepSeek = parse_url(config()->string('banner.openai.base_url'), PHP_URL_HOST) === 'api.deepseek.com';
+        if ($deepSeek) {
+            $structured = ['response_format' => ['type' => 'json_object']];
+        }
+
         try {
             $response = $this->request($apiKey, $payload + $structured);
 
@@ -62,8 +67,11 @@ class OpenAiLayoutProvider implements LayoutProvider
         }
 
         if ($response->failed()) {
+            $message = strtolower((string) $response->json('error.message'));
             throw new AiProviderException(match (true) {
-                $response->status() === 401 => 'Kredensial penyedia AI ditolak. Periksa OPENAI_API_KEY.',
+                $response->status() === 400 && $deepSeek && str_contains($message, 'supported api model names') => 'Model layout DeepSeek tidak didukung. Pilih deepseek-flash atau deepseek-v4-pro di pengaturan AI Global. Janus-Pro-7B tidak tersedia melalui API chat DeepSeek.',
+                $response->status() === 401 => 'Kredensial penyedia AI ditolak. Periksa API key di pengaturan AI Global.',
+                $response->status() === 402 => 'Saldo penyedia AI tidak mencukupi. Periksa saldo akun API Anda.',
                 $response->status() === 429 => 'Penyedia AI sedang membatasi permintaan. Coba lagi beberapa saat lagi.',
                 default => "Penyedia AI mengembalikan galat (HTTP {$response->status()}).",
             });
