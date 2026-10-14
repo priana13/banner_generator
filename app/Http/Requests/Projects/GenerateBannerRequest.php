@@ -26,6 +26,7 @@ class GenerateBannerRequest extends FormRequest
             'prompt' => ['required', 'string', 'min:5', 'max:'.config()->integer('banner.max_prompt_length')],
             'style' => ['nullable', 'string', Rule::in(BannerComposer::STYLES)],
             'primary_color' => ['required', 'string', 'regex:'.Color::HEX_PATTERN],
+            'background_color' => ['nullable', 'string', 'regex:'.Color::HEX_PATTERN],
             'width' => ['required', 'integer', "between:{$min},{$max}"],
             'height' => ['required', 'integer', "between:{$min},{$max}"],
             'photo_asset_id' => ['nullable', 'uuid', $asset],

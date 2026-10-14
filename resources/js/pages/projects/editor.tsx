@@ -97,7 +97,8 @@ export default function Editor({
             .load(project.id, initialDocument, assets, version);
 
         if (brief?.primary_color) {
-            useEditorStore.getState().setAccent(brief.primary_color);
+            // Only restores the picker; the saved design keeps its colors.
+            useEditorStore.getState().setAccent(brief.primary_color, false);
         }
 
         // The server props are only the starting point; afterwards the

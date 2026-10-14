@@ -465,3 +465,14 @@ test('the llm can return a multi-color headline, subheadline and cta color', fun
 
     Http::assertSent(fn ($request) => in_array('headlineSegments', $request['response_format']['json_schema']['schema']['required'], true));
 });
+
+test('the cutout style keeps a light canvas color and ignores an unreadable one', function (string $requested, string $expected) {
+    $this->postJson(route('api.projects.generate', $this->project), [
+        ...$this->brief, 'style' => 'cutout', 'background_color' => $requested,
+    ])->assertAccepted()->assertJsonPath('status', 'succeeded');
+
+    expect($this->project->refresh()->currentRevision->document_json['canvas']['backgroundColor'])->toBe($expected);
+})->with([
+    'light pink is kept' => ['#FFE4E6', '#ffe4e6'],
+    'dark navy would hide the copy' => ['#0f172a', '#ffffff'],
+]);

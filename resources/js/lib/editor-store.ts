@@ -53,7 +53,11 @@ type EditorState = {
     setCanvas: (patch: Partial<DesignCanvas>, coalesceKey?: string) => void;
     undo: () => void;
     redo: () => void;
-    setAccent: (accent: string) => void;
+    /**
+     * Change the brand color. By default the current design follows:
+     * everything drawn in the old color (or its dark shade) is recolored.
+     */
+    setAccent: (accent: string, recolor?: boolean) => void;
     setZoom: (zoom: number) => void;
 };
 
@@ -62,6 +66,23 @@ const emptyDocument: DesignDocument = {
     canvas: { width: 1200, height: 400, backgroundColor: '#ffffff' },
     elements: [],
 };
+
+/**
+ * The deep shade generated designs pair with the brand color. Mirrors
+ * `Color::mix($accent, '#000000', 0.45)` in BannerComposer.
+ */
+export function darkShade(hex: string): string {
+    return (
+        '#' +
+        [1, 3, 5]
+            .map((at) =>
+                Math.round(parseInt(hex.slice(at, at + 2), 16) * 0.55)
+                    .toString(16)
+                    .padStart(2, '0'),
+            )
+            .join('')
+    );
+}
 
 function indexAssets(assets: EditorAsset[]): Record<string, EditorAsset> {
     return Object.fromEntries(assets.map((asset) => [asset.id, asset]));
@@ -248,7 +269,55 @@ export const useEditorStore = create<EditorState>((set, get) => {
             });
         },
 
-        setAccent: (accent) => set({ accent }),
+        setAccent: (accent, recolor = true) => {
+            const { accent: previous, document } = get();
+
+            set({ accent });
+
+            if (!recolor || accent.toLowerCase() === previous.toLowerCase()) {
+                return;
+            }
+
+            const swaps = new Map([
+                [previous.toLowerCase(), accent.toLowerCase()],
+                [darkShade(previous), darkShade(accent)],
+            ]);
+            const swap = (color: string): string =>
+                swaps.get(color.toLowerCase()) ?? color;
+            let changed = false;
+
+            const elements = document.elements.map((element) => {
+                const next = { ...element } as DesignElement;
+
+                if ('fill' in next) {
+                    next.fill = swap(next.fill);
+                }
+
+                if (next.type === 'button') {
+                    next.textColor = swap(next.textColor);
+                }
+
+                if (next.type === 'text' && next.spans) {
+                    next.spans = next.spans.map((span) => ({
+                        ...span,
+                        fill: swap(span.fill),
+                    }));
+                }
+
+                if (JSON.stringify(next) === JSON.stringify(element)) {
+                    return element;
+                }
+
+                changed = true;
+
+                return next;
+            });
+
+            if (changed) {
+                // Dragging through the color picker is one undo step.
+                commit({ ...document, elements }, 'accent');
+            }
+        },
 
         setZoom: (zoom) => set({ zoom: Math.min(2, Math.max(0.1, zoom)) }),
     };

@@ -137,6 +137,7 @@ export function useGeneration(
                 photo_asset_id: brief.photoAssetId,
                 logo_asset_id: brief.logoAssetId,
                 style: brief.style,
+                background_color: document.canvas.backgroundColor,
                 idempotency_key: uid(),
             });
         });

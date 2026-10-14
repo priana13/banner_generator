@@ -89,7 +89,7 @@ class GenerateBannerJob implements ShouldQueue
         if ($style === BannerComposer::STYLE_CUTOUT) {
             // A clean, light design built from the uploaded photo and
             // built-in ornaments: no image model is involved.
-            $document = $composer->composeCutout($spec, $brief, $photo, $logo);
+            $document = $composer->composeCutout($spec, $brief, $photo, $logo, $request['background_color'] ?? null);
         } else {
             // With an uploaded photo the AI paints the backdrop; otherwise it
             // produces the visual itself. Either way it is stored as its own asset.

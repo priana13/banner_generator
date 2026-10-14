@@ -139,10 +139,22 @@ class BannerComposer
      * bottom edge with foliage in front of it.
      *
      * @param  DesignSpec  $spec
+     * @param  string|null  $backgroundColor  Canvas color to keep, if light enough.
      * @return Document
      */
-    public function composeCutout(array $spec, DesignBrief $brief, ?Asset $photo = null, ?Asset $logo = null): array
-    {
+    public function composeCutout(
+        array $spec,
+        DesignBrief $brief,
+        ?Asset $photo = null,
+        ?Asset $logo = null,
+        ?string $backgroundColor = null,
+    ): array {
+        // The canvas color the user picked is kept as long as the dark
+        // copy stays readable on it.
+        $background = $backgroundColor !== null && Color::contrast('#3f3f46', $backgroundColor) >= 4.5
+            ? strtolower($backgroundColor)
+            : '#ffffff';
+
         $width = $brief->width;
         $height = $brief->height;
         $accent = strtolower($brief->accentColor);
@@ -217,7 +229,7 @@ class BannerComposer
 
         foreach ($spans as $index => $span) {
             $fill = $span['fill'] ?? ($index === $last ? $dark : $accent);
-            $spans[$index]['fill'] = Color::contrast($fill, '#ffffff') >= 1.8 ? $fill : $dark;
+            $spans[$index]['fill'] = Color::contrast($fill, $background) >= 1.8 ? $fill : $dark;
         }
 
         $textBox = $this->inset($textPanel, $wide ? 0.13 : 0.1);
@@ -227,7 +239,7 @@ class BannerComposer
             $textBox['width'] -= (int) round($textPanel['width'] * 0.04);
         }
 
-        return $this->document($width, $height, '#ffffff', [
+        return $this->document($width, $height, $background, [
             ...$elements,
             ...$this->copy([...$spec, 'label' => '', 'headlineSpans' => $spans], self::STYLE_CUTOUT, $textBox, $logo, [
                 'label' => $dark,
