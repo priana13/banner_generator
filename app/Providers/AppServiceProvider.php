@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Services\Ai\Contracts\ImageProvider;
 use App\Services\Ai\Contracts\LayoutProvider;
+use App\Services\Ai\GlobalAiSettings;
+use App\Services\Ai\Providers\GeminiImageProvider;
+use App\Services\Ai\Providers\GeminiLayoutProvider;
 use App\Services\Ai\Providers\LocalImageProvider;
 use App\Services\Ai\Providers\LocalLayoutProvider;
 use App\Services\Ai\Providers\OpenAiImageProvider;
@@ -24,14 +27,24 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(LayoutProvider::class, fn (): LayoutProvider => match (config('banner.layout_provider')) {
-            'openai' => new OpenAiLayoutProvider,
-            default => new LocalLayoutProvider,
+        $this->app->bind(LayoutProvider::class, function (): LayoutProvider {
+            app(GlobalAiSettings::class)->apply();
+
+            return match (config('banner.layout_provider')) {
+                'gemini' => new GeminiLayoutProvider,
+                'openai' => new OpenAiLayoutProvider,
+                default => new LocalLayoutProvider,
+            };
         });
 
-        $this->app->bind(ImageProvider::class, fn (): ImageProvider => match (config('banner.image_provider')) {
-            'openai' => new OpenAiImageProvider,
-            default => new LocalImageProvider,
+        $this->app->bind(ImageProvider::class, function (): ImageProvider {
+            app(GlobalAiSettings::class)->apply();
+
+            return match (config('banner.image_provider')) {
+                'gemini' => new GeminiImageProvider,
+                'openai' => new OpenAiImageProvider,
+                default => new LocalImageProvider,
+            };
         });
     }
 

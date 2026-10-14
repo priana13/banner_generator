@@ -3,6 +3,7 @@
 use App\Enums\GenerationStatus;
 use App\Enums\ProjectStatus;
 use App\Jobs\GenerateBannerJob;
+use App\Models\Asset;
 use App\Models\GenerationJob;
 use App\Models\Project;
 use App\Models\User;
@@ -476,3 +477,21 @@ test('the cutout style keeps a light canvas color and ignores an unreadable one'
     'light pink is kept' => ['#FFE4E6', '#ffe4e6'],
     'dark navy would hide the copy' => ['#0f172a', '#ffffff'],
 ]);
+
+test('Gemini-generated images are stored as private banner assets', function () {
+    config(['banner.image_provider' => 'gemini', 'banner.gemini.api_key' => 'gemini-secret']);
+    $png = UploadedFile::fake()->image('gemini.png', 64, 64)->getContent();
+    Http::preventStrayRequests();
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response([
+        'candidates' => [['content' => ['parts' => [
+            ['inlineData' => ['mimeType' => 'image/png', 'data' => base64_encode($png)]],
+        ]]]],
+    ])]);
+    $this->postJson(route('api.projects.generate', $this->project), $this->brief)
+        ->assertAccepted()->assertJsonPath('status', 'succeeded');
+    $asset = $this->project->assets()->where('kind', Asset::KIND_GENERATED)->sole();
+    expect($asset->metadata_json['provider'])->toBe('gemini');
+    $document = $this->project->refresh()->currentRevision->document_json;
+    expect(collect($document['elements'])->firstWhere('name', 'Visual AI')['assetId'])->toBe($asset->id)
+        ->and(json_encode($document))->not->toContain('gemini-secret');
+});

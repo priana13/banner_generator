@@ -11,6 +11,7 @@ import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
 
 const sidebarNavItems: NavItem[] = [
+    { title: 'AI Global', href: '/settings/ai', icon: null },
     {
         title: 'Profile',
         href: edit(),

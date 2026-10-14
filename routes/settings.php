@@ -1,12 +1,16 @@
 <?php
 
+use App\Http\Controllers\Settings\AiController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
-    Route::redirect('settings', '/settings/profile');
+    Route::get('settings', fn () => redirect('/settings/profile'));
+
+    Route::get('settings/ai', [AiController::class, 'edit'])->name('ai.edit');
+    Route::put('settings/ai', [AiController::class, 'update'])->middleware('throttle:6,1')->name('ai.update');
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
