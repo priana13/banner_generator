@@ -43,28 +43,49 @@ export type ButtonElement = BaseElement &
         cornerRadius: number;
     };
 
+/**
+ * A transparency gradient: fading out towards one side (`linear`), or
+ * feathered along all edges (`edges`). `amount` is the share of the element
+ * the gradient covers, 0–1.
+ */
+export type ElementFade =
+    | { type: 'linear'; direction: FadeDirection; amount: number }
+    | { type: 'edges'; amount: number };
+
+export type FadeDirection = 'left' | 'right' | 'top' | 'bottom';
+
 export type RectElement = BaseElement & {
     type: 'rect';
+    fade?: ElementFade;
     fill: string;
     cornerRadius: number;
 };
 
 export type CircleElement = BaseElement & {
     type: 'circle';
+    fade?: ElementFade;
     fill: string;
 };
 
 export type ImageElement = BaseElement & {
     type: 'image';
+    fade?: ElementFade;
     assetId: string;
 };
 
 /** A built-in decorative vector (see lib/ornaments.ts). */
 export type OrnamentElement = BaseElement & {
     type: 'ornament';
+    fade?: ElementFade;
     ornamentId: string;
     fill: string;
 };
+
+export type FadableElement =
+    | RectElement
+    | CircleElement
+    | ImageElement
+    | OrnamentElement;
 
 export type DesignElement =
     | OrnamentElement
@@ -80,7 +101,7 @@ export type ElementPatch = Partial<
         Omit<ButtonElement, 'id' | 'type'> &
         Omit<RectElement, 'id' | 'type'> &
         Omit<ImageElement, 'id' | 'type'>
-> & { spans?: TextSpan[] | undefined };
+> & { spans?: TextSpan[] | undefined; fade?: ElementFade | undefined };
 
 export type DesignCanvas = {
     width: number;

@@ -13,6 +13,13 @@ final class DocumentRules
 
     public const ELEMENT_TYPES = ['text', 'button', 'rect', 'circle', 'image', 'ornament'];
 
+    /** Elements that can fade out towards one side or along their edges. */
+    public const FADABLE_TYPES = ['image', 'ornament', 'rect', 'circle'];
+
+    public const FADE_TYPES = ['linear', 'edges'];
+
+    public const FADE_DIRECTIONS = ['left', 'right', 'top', 'bottom'];
+
     /** Regular, SemiBold, Bold and ExtraBold. */
     public const FONT_STYLES = ['normal', '600', 'bold', '800'];
 
@@ -57,6 +64,11 @@ final class DocumentRules
             "{$el}.fill" => ['nullable', 'string', $color],
             "{$el}.textColor" => ['nullable', 'string', $color],
             "{$el}.cornerRadius" => ['nullable', 'numeric', 'between:0,10000'],
+            // Optional transparency gradient: towards one side, or feathered edges.
+            "{$el}.fade" => ['nullable', 'array'],
+            "{$el}.fade.type" => ["required_with:{$el}.fade", 'string', Rule::in(self::FADE_TYPES)],
+            "{$el}.fade.direction" => ['nullable', 'string', Rule::in(self::FADE_DIRECTIONS)],
+            "{$el}.fade.amount" => ["required_with:{$el}.fade", 'numeric', 'between:0.01,1'],
             "{$el}.assetId" => ["required_if:{$el}.type,image", 'nullable', 'uuid'],
             "{$el}.ornamentId" => [
                 "required_if:{$el}.type,ornament", 'nullable', 'string',

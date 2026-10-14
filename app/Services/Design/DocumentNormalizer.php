@@ -93,6 +93,12 @@ class DocumentNormalizer
             $font['text'] = implode(' ', array_column($spans, 'text'));
         }
 
+        if (in_array($type, DocumentRules::FADABLE_TYPES, true) && is_array($element['fade'] ?? null)) {
+            $fade = $element['fade'];
+            $base['fade'] = ['type' => (string) $fade['type'], 'amount' => $this->number($fade['amount'])]
+                + ($fade['type'] === 'linear' ? ['direction' => (string) ($fade['direction'] ?? 'bottom')] : []);
+        }
+
         return $base + match ($type) {
             'text' => $font + [
                 'align' => (string) ($element['align'] ?? 'left'),

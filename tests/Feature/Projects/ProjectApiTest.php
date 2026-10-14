@@ -232,3 +232,43 @@ test('the rendered canvas can be exported as webp and jpeg', function (string $f
         ->and($info[0])->toBe(1200)
         ->and($info[1])->toBe(400);
 })->with([['webp', 'image/webp'], ['jpeg', 'image/jpeg']]);
+
+test('transparency gradients are saved for shapes and images only', function () {
+    $user = User::factory()->create();
+    $project = createProject($user);
+    $box = ['x' => 0, 'y' => 0, 'width' => 100, 'height' => 100];
+
+    $this->patchJson(route('api.projects.document', $project), [
+        'version' => 1,
+        'document' => sampleDocument([
+            ['id' => 'a', 'type' => 'rect', ...$box, 'fade' => ['type' => 'linear', 'direction' => 'left', 'amount' => 0.5]],
+            ['id' => 'b', 'type' => 'ornament', 'ornamentId' => 'glow', ...$box, 'fade' => ['type' => 'edges', 'direction' => 'left', 'amount' => 1]],
+            ['id' => 'c', 'type' => 'circle', ...$box],
+            ['id' => 'd', 'type' => 'text', 'text' => 'Halo', ...$box, 'fade' => ['type' => 'edges', 'amount' => 0.3]],
+        ]),
+    ])->assertOk();
+
+    $elements = collect($project->refresh()->currentRevision->document_json['elements'])->keyBy('id');
+
+    expect($elements['a']['fade'])->toBe(['type' => 'linear', 'amount' => 0.5, 'direction' => 'left'])
+        ->and($elements['b']['fade'])->toBe(['type' => 'edges', 'amount' => 1])
+        ->and($elements['c'])->not->toHaveKey('fade')
+        ->and($elements['d'])->not->toHaveKey('fade');
+});
+
+test('invalid transparency gradients are rejected', function (array $fade) {
+    $user = User::factory()->create();
+    $project = createProject($user);
+
+    $this->patchJson(route('api.projects.document', $project), [
+        'version' => 1,
+        'document' => sampleDocument([[
+            'id' => 'a', 'type' => 'rect', 'x' => 0, 'y' => 0, 'width' => 10, 'height' => 10, 'fade' => $fade,
+        ]]),
+    ])->assertUnprocessable();
+})->with([
+    'unknown type' => [['type' => 'radial', 'amount' => 0.5]],
+    'unknown direction' => [['type' => 'linear', 'direction' => 'diagonal', 'amount' => 0.5]],
+    'amount out of range' => [['type' => 'edges', 'amount' => 4]],
+    'missing amount' => [['type' => 'edges']],
+]);

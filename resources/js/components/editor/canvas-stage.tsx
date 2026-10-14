@@ -1,6 +1,6 @@
 import type Konva from 'konva';
 import type { RefObject } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
     Ellipse,
     Group,
@@ -15,11 +15,13 @@ import { useFontsReady } from '@/hooks/use-fonts-ready';
 import { useImage } from '@/hooks/use-image';
 import { LINE_HEIGHT } from '@/lib/editor-elements';
 import { useEditorStore } from '@/lib/editor-store';
+import { renderFaded } from '@/lib/fade';
 import { ornamentUrl } from '@/lib/ornaments';
 import { layoutSpans } from '@/lib/text-layout';
 import type {
     DesignElement,
     ElementPatch,
+    FadableElement,
     ImageElement,
     OrnamentElement,
     TextElement,
@@ -78,6 +80,42 @@ function OrnamentNode({
         <KonvaImage
             {...common}
             image={image}
+            width={element.width}
+            height={element.height}
+        />
+    ) : null;
+}
+
+/**
+ * An element with a transparency gradient. It is drawn off-screen with the
+ * gradient applied and placed on the stage as an image.
+ */
+function FadedNode({
+    element,
+    common,
+}: {
+    element: FadableElement;
+    common: Konva.NodeConfig;
+}) {
+    const asset = useEditorStore((state) =>
+        element.type === 'image' ? state.assets[element.assetId] : undefined,
+    );
+    const url =
+        element.type === 'image'
+            ? asset?.url
+            : element.type === 'ornament'
+              ? ornamentUrl(element.ornamentId, element.fill)
+              : undefined;
+    const image = useImage(url);
+    const rendered = useMemo(
+        () => renderFaded(element, image),
+        [element, image],
+    );
+
+    return rendered ? (
+        <KonvaImage
+            {...common}
+            image={rendered}
             width={element.width}
             height={element.height}
         />
@@ -170,6 +208,10 @@ function ElementNode({ element }: { element: DesignElement }) {
             updateElement(element.id, patch);
         },
     };
+
+    if ('fade' in element && element.fade) {
+        return <FadedNode element={element} common={common} />;
+    }
 
     switch (element.type) {
         case 'ornament':

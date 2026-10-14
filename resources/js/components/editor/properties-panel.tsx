@@ -3,6 +3,8 @@ import {
     AlignLeft,
     AlignRight,
     ArrowDown,
+    ArrowLeft,
+    ArrowRight,
     ArrowUp,
     Eraser,
     LoaderCircle,
@@ -15,7 +17,14 @@ import { removeBackground } from '@/lib/background-removal';
 import { uploadImage } from '@/lib/image-processing';
 import { useEditorStore, useSelectedElement } from '@/lib/editor-store';
 import { cn } from '@/lib/utils';
-import type { ElementPatch, FontStyle, ImageElement, TextSpan } from '@/types';
+import type {
+    ElementFade,
+    ElementPatch,
+    FadeDirection,
+    FontStyle,
+    ImageElement,
+    TextSpan,
+} from '@/types';
 
 const inputClass =
     'mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm';
@@ -106,6 +115,97 @@ function RemoveBackgroundButton({
                 Diproses di browser Anda; foto tidak dikirim ke pihak ketiga.
                 Pemakaian pertama mengunduh model ±25 MB.
             </p>
+        </div>
+    );
+}
+
+const FADE_DIRECTIONS: {
+    value: FadeDirection;
+    label: string;
+    icon: typeof ArrowUp;
+}[] = [
+    { value: 'left', label: 'Memudar ke kiri', icon: ArrowLeft },
+    { value: 'right', label: 'Memudar ke kanan', icon: ArrowRight },
+    { value: 'top', label: 'Memudar ke atas', icon: ArrowUp },
+    { value: 'bottom', label: 'Memudar ke bawah', icon: ArrowDown },
+];
+
+/**
+ * Transparency gradient: fade the element out towards one side, or soften
+ * only its edges.
+ */
+function FadeControls({
+    fade,
+    onChange,
+}: {
+    fade: ElementFade | undefined;
+    onChange: (fade: ElementFade | undefined) => void;
+}) {
+    const amount = fade?.amount ?? 0.4;
+
+    return (
+        <div className="space-y-3 border-t border-slate-200 pt-4">
+            <Field label="Gradasi transparan">
+                <select
+                    value={fade?.type ?? 'none'}
+                    onChange={(event) => {
+                        const type = event.target.value;
+
+                        onChange(
+                            type === 'linear'
+                                ? { type, direction: 'bottom', amount }
+                                : type === 'edges'
+                                  ? { type, amount }
+                                  : undefined,
+                        );
+                    }}
+                    className={inputClass}
+                >
+                    <option value="none">Tidak ada</option>
+                    <option value="linear">Memudar ke satu sisi</option>
+                    <option value="edges">Hanya bagian pinggir</option>
+                </select>
+            </Field>
+
+            {fade?.type === 'linear' && (
+                <div className="flex gap-2">
+                    {FADE_DIRECTIONS.map((direction) => (
+                        <ToggleButton
+                            key={direction.value}
+                            active={fade.direction === direction.value}
+                            label={direction.label}
+                            onClick={() =>
+                                onChange({
+                                    ...fade,
+                                    direction: direction.value,
+                                })
+                            }
+                        >
+                            <direction.icon className="size-4" />
+                        </ToggleButton>
+                    ))}
+                </div>
+            )}
+
+            {fade && (
+                <Field
+                    label={`${fade.type === 'edges' ? 'Kelembutan pinggir' : 'Panjang gradasi'} (${Math.round(fade.amount * 100)}%)`}
+                >
+                    <input
+                        type="range"
+                        min={5}
+                        max={100}
+                        value={Math.round(fade.amount * 100)}
+                        onChange={(event) =>
+                            onChange({
+                                ...fade,
+                                amount: Number(event.target.value) / 100,
+                            })
+                        }
+                        className="mt-1 w-full accent-orange-500"
+                    />
+                </Field>
+            )}
         </div>
     );
 }
@@ -482,6 +582,19 @@ export function PropertiesPanel({
                         className="mt-1 w-full accent-orange-500"
                     />
                 </Field>
+
+                {element.type !== 'text' && element.type !== 'button' && (
+                    <FadeControls
+                        fade={element.fade}
+                        onChange={(fade) =>
+                            updateElement(
+                                element.id,
+                                { fade },
+                                `${element.id}:fade`,
+                            )
+                        }
+                    />
+                )}
 
                 <div className="flex gap-2">
                     <button
