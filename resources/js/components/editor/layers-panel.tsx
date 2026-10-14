@@ -149,35 +149,52 @@ function OrnamentPicker({ projectId }: { projectId: number }) {
 
     return (
         <>
-            <div className="mt-4 text-xs font-semibold text-slate-600">
-                Ornamen
-            </div>
-            <div className="mt-2 grid grid-cols-5 gap-1.5">
-                {Object.entries(ORNAMENTS).map(([id, ornament]) => (
-                    <button
-                        key={id}
-                        type="button"
-                        title={ornament.label}
-                        aria-label={`Tambah ornamen ${ornament.label}`}
-                        onClick={() =>
-                            addElement(
-                                createOrnament(
-                                    state().document.canvas,
-                                    id,
-                                    state().accent,
-                                ),
+            {(
+                [
+                    { label: 'Ramadan', theme: 'ramadan' },
+                    { label: 'Ornamen umum', theme: undefined },
+                ] as const
+            ).map((group) => (
+                <section
+                    key={group.label}
+                    aria-label={`Ornamen ${group.label}`}
+                >
+                    <div className="mt-4 text-xs font-semibold text-slate-600">
+                        {group.label}
+                    </div>
+                    <div className="mt-2 grid grid-cols-5 gap-1.5">
+                        {Object.entries(ORNAMENTS)
+                            .filter(
+                                ([, ornament]) =>
+                                    ornament.theme === group.theme,
                             )
-                        }
-                        className={tileClass}
-                    >
-                        <img
-                            src={ornamentUrl(id, '#16a34a')}
-                            alt=""
-                            className="max-h-full max-w-full"
-                        />
-                    </button>
-                ))}
-            </div>
+                            .map(([id, ornament]) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    title={ornament.label}
+                                    aria-label={`Tambah ornamen ${ornament.label}`}
+                                    onClick={() =>
+                                        addElement(
+                                            createOrnament(
+                                                state().document.canvas,
+                                                id,
+                                                state().accent,
+                                            ),
+                                        )
+                                    }
+                                    className={tileClass}
+                                >
+                                    <img
+                                        src={ornamentUrl(id, '#16a34a')}
+                                        alt=""
+                                        className="max-h-full max-w-full"
+                                    />
+                                </button>
+                            ))}
+                    </div>
+                </section>
+            ))}
 
             <div className="mt-4 text-xs font-semibold text-slate-600">
                 Ornamen saya

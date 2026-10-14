@@ -124,6 +124,12 @@ return [
         'crescent' => [200, 200],
         'arch' => [200, 260],
         'heart' => [200, 180],
+        'ramadan_lantern' => [200, 300],
+        'ramadan_mosque' => [400, 240],
+        'ramadan_ketupat' => [220, 300],
+        'ramadan_moon_stars' => [280, 240],
+        'ramadan_garland' => [500, 280],
+        'ramadan_pattern' => [500, 200],
     ],
 
     'max_user_ornaments' => 60,
