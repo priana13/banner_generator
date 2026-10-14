@@ -129,8 +129,8 @@ class BannerComposer
                 'subheadline' => $spec['textColor'],
                 'description' => Color::mix($spec['textColor'], $spec['backgroundColor'], 0.3),
                 'button' => $spec['ctaColor'] ?? $accent,
-            ]),
-        ]);
+            ], $brief->designStyle['font'] ?? null),
+        ], $brief, $panel);
     }
 
     /**
@@ -247,8 +247,8 @@ class BannerComposer
                 'subheadline' => '#3f3f46',
                 'description' => '#52525b',
                 'button' => $spec['ctaColor'] ?? $dark,
-            ]),
-        ]);
+            ], $brief->designStyle['font'] ?? null),
+        ], $brief, $panel);
     }
 
     /**
@@ -261,9 +261,12 @@ class BannerComposer
      * @param  array{label: string, headline: string, subheadline: string, description: string, button: string}  $colors
      * @return list<array<string, mixed>>
      */
-    private function copy(array $spec, string $style, array $box, ?Asset $logo, array $colors): array
+    private function copy(array $spec, string $style, array $box, ?Asset $logo, array $colors, ?string $font = null): array
     {
         $type = self::TYPOGRAPHY[$style];
+        if ($font !== null && in_array($font, config()->array('banner.fonts'), true)) {
+            $type['font'] = $font;
+        }
         $heights = $sizes = ['label' => 0, 'headline' => 0, 'subheadline' => 0, 'description' => 0];
         $unit = min($box['height'], $box['width'] * 0.75);
 
@@ -356,8 +359,43 @@ class BannerComposer
      * @param  list<array<string, mixed>>  $elements
      * @return Document
      */
-    private function document(int $width, int $height, string $backgroundColor, array $elements): array
+    private function document(int $width, int $height, string $backgroundColor, array $elements, ?DesignBrief $brief = null, ?array $visualPanel = null): array
     {
+        $ornaments = $brief?->designStyle['ornaments'] ?? null;
+        if (is_array($ornaments)) {
+            // A selected theme replaces the default decoration; all resulting
+            // ornaments remain independent, editable canvas layers.
+            $elements = array_values(array_filter($elements, fn (array $element) => $element['type'] !== 'ornament' && ($element['name'] ?? '') !== 'Dekorasi'));
+            $panel = $visualPanel ?? collect($elements)->firstWhere('name', 'Panel warna')
+                ?? $this->visualBox($width, $height, 'visual-right', 0.4);
+            $padding = max(2, (int) round(min($width, $height) * 0.03));
+            $decorations = [];
+            foreach (array_slice($ornaments, 0, 3) as $index => $id) {
+                $size = config('banner.ornaments.'.$id);
+                if (! is_array($size)) {
+                    continue;
+                }
+                $scale = min($panel['width'], $panel['height']) * 0.24 / max($size);
+                $w = max(1, (int) round($size[0] * $scale));
+                $h = max(1, (int) round($size[1] * $scale));
+                $decorations[] = [
+                    'type' => 'ornament', 'ornamentId' => $id, 'name' => 'Gaya: '.$id,
+                    'fill' => strtolower($brief->accentColor), 'opacity' => 0.6,
+                    'x' => $index === 2 ? $panel['x'] + $padding : $panel['x'] + $panel['width'] - $w - $padding,
+                    'y' => $index === 1 ? $panel['y'] + $panel['height'] - $h - $padding : $panel['y'] + $padding,
+                    'width' => $w, 'height' => $h,
+                ];
+            }
+            $copyIndex = count($elements);
+            foreach ($elements as $index => $element) {
+                if (in_array($element['type'], ['text', 'button'], true)) {
+                    $copyIndex = $index;
+                    break;
+                }
+            }
+            array_splice($elements, $copyIndex, 0, $decorations);
+        }
+
         return $this->normalizer->normalize([
             'canvas' => ['width' => $width, 'height' => $height, 'backgroundColor' => $backgroundColor],
             'elements' => array_map(

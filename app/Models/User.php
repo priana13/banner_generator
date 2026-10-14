@@ -61,6 +61,12 @@ class User extends Authenticatable
         return $this->hasMany(ProjectCategory::class);
     }
 
+    /** @return HasMany<DesignStyle, $this> */
+    public function designStyles(): HasMany
+    {
+        return $this->hasMany(DesignStyle::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

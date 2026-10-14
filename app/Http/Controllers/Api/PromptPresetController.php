@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PromptPreset;
 use App\Services\Design\BannerComposer;
 use App\Services\Design\Color;
+use App\Services\Design\DesignStyles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -34,6 +35,7 @@ class PromptPresetController extends Controller
             'name' => ['required', 'string', 'max:80'],
             'prompt' => ['required', 'string', 'min:5', 'max:'.config()->integer('banner.max_prompt_length')],
             'primary_color' => ['nullable', 'string', 'regex:'.Color::HEX_PATTERN],
+            'design_style' => ['nullable', 'string', Rule::in(array_column(app(DesignStyles::class)->available($request->user()), 'key'))],
             'style' => ['nullable', 'string', Rule::in(BannerComposer::STYLES)],
         ]);
 
@@ -51,6 +53,7 @@ class PromptPresetController extends Controller
                 'settings_json' => [
                     'primary_color' => $data['primary_color'] ?? null,
                     'style' => $data['style'] ?? null,
+                    'design_style' => $data['design_style'] ?? null,
                 ],
             ],
         );

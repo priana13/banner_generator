@@ -36,7 +36,7 @@ class GeminiImageProvider implements ImageProvider
         $style = $request->purpose === ImageRequest::PURPOSE_BACKGROUND
             ? 'Soft, low-contrast abstract background with plenty of empty space.'
             : 'Clean, professional marketing photo or illustration with a clear subject.';
-        $prompt = "{$request->prompt}\n\n{$style} Dominant color {$request->accentColor}. "
+        $prompt = "{$request->prompt}\n\nDesign style guidance: {$request->styleInstructions}\n\n{$style} Dominant color {$request->accentColor}. "
             .'Absolutely no text, letters, numbers, logos or visible watermarks.';
         $ratio = $request->width / $request->height;
 

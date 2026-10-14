@@ -344,6 +344,7 @@ export default function Editor({
                         generation={generation}
                         brief={brief}
                         maxPromptLength={maxPromptLength}
+                        fonts={fonts}
                     />
                     <ElementsPanel projectId={project.id} />
                     <LayersPanel />

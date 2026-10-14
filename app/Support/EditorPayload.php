@@ -36,6 +36,7 @@ final class EditorPayload
                 'prompt' => (string) ($job->request_json['prompt'] ?? ''),
                 'primary_color' => $job->request_json['primary_color'] ?? null,
                 'style' => $job->request_json['style'] ?? null,
+                'design_style' => $job->request_json['design_style'] ?? null,
             ],
         ];
     }

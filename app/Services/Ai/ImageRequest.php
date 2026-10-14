@@ -14,5 +14,6 @@ final readonly class ImageRequest
         public int $height,
         public string $accentColor,
         public string $purpose,
+        public string $styleInstructions = '',
     ) {}
 }

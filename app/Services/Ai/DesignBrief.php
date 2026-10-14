@@ -9,5 +9,6 @@ final readonly class DesignBrief
         public int $width,
         public int $height,
         public string $accentColor,
+        public ?array $designStyle = null,
     ) {}
 }

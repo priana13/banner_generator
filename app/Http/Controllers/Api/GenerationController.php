@@ -10,6 +10,7 @@ use App\Jobs\GenerateBannerJob;
 use App\Models\GenerationJob;
 use App\Models\Project;
 use App\Services\Ai\Contracts\LayoutProvider;
+use App\Services\Design\DesignStyles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
@@ -47,6 +48,8 @@ class GenerationController extends Controller
                 'message' => 'Kuota generate harian Anda sudah habis. Silakan coba lagi besok.',
             ], 429);
         }
+
+        $data['design_style_snapshot'] = app(DesignStyles::class)->snapshot($request->user(), $data['design_style'] ?? null);
 
         $job = $project->generationJobs()->create([
             'user_id' => $request->user()->id,

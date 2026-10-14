@@ -74,6 +74,7 @@ class GenerateBannerJob implements ShouldQueue
             (int) $request['width'],
             (int) $request['height'],
             (string) $request['primary_color'],
+            $request['design_style_snapshot'] ?? null,
         );
 
         $layout = $layouts->generate($brief);
@@ -100,6 +101,7 @@ class GenerateBannerJob implements ShouldQueue
 
             $image = $images->generate(new ImageRequest(
                 $spec['imagePrompt'], $box['width'], $box['height'], $brief->accentColor, $purpose,
+                $brief->designStyle['image_instructions'] ?? '',
             ));
 
             $generated = $assets->store($project, $image->binary, Asset::KIND_GENERATED, [

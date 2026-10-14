@@ -19,6 +19,7 @@ export type GenerationBrief = {
     photoAssetId: string | null;
     logoAssetId: string | null;
     style: BannerStyle;
+    designStyle: string | null;
 };
 
 function isActive(job: GenerationJob | null): boolean {
@@ -137,6 +138,7 @@ export function useGeneration(
                 photo_asset_id: brief.photoAssetId,
                 logo_asset_id: brief.logoAssetId,
                 style: brief.style,
+                design_style: brief.designStyle,
                 background_color: document.canvas.backgroundColor,
                 idempotency_key: uid(),
             });

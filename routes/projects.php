@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AssetController as ApiAssetController;
+use App\Http\Controllers\Api\DesignStyleController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\GenerationController;
 use App\Http\Controllers\Api\OrnamentController;
@@ -21,6 +22,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // JSON endpoints used by the editor. They share the session guard and
     // CSRF protection of the web group; no API key ever reaches the browser.
     Route::prefix('api')->name('api.')->middleware('throttle:240,1')->group(function () {
+        Route::get('design-styles', [DesignStyleController::class, 'index'])->name('design-styles.index');
+        Route::post('design-styles', [DesignStyleController::class, 'store'])->name('design-styles.store');
+        Route::patch('design-styles/{designStyle}', [DesignStyleController::class, 'update'])->name('design-styles.update');
+        Route::delete('design-styles/{designStyle}', [DesignStyleController::class, 'destroy'])->name('design-styles.destroy');
+
         Route::post('project-categories', [ProjectCategoryController::class, 'store'])->name('project-categories.store');
         Route::patch('project-categories/{category}', [ProjectCategoryController::class, 'update'])->name('project-categories.update');
         Route::delete('project-categories/{category}', [ProjectCategoryController::class, 'destroy'])->name('project-categories.destroy');

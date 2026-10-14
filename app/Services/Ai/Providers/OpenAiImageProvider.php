@@ -78,7 +78,7 @@ class OpenAiImageProvider implements ImageProvider
             ? 'Soft, low-contrast abstract background with plenty of empty space.'
             : 'Clean, professional marketing photo or illustration with a clear subject.';
 
-        return "{$request->prompt}\n\n{$style} Dominant color {$request->accentColor}. "
+        return "{$request->prompt}\n\nDesign style guidance: {$request->styleInstructions}\n\n{$style} Dominant color {$request->accentColor}. "
             .'Absolutely no text, letters, numbers, logos or watermarks.';
     }
 }

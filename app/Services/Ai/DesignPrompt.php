@@ -36,7 +36,10 @@ class DesignPrompt
 
     public function brief(DesignBrief $brief): string
     {
-        return "Brief: {$brief->prompt}\nCanvas: {$brief->width}x{$brief->height}px\nBrand color: {$brief->accentColor}";
+        $guidance = $brief->designStyle['text_instructions'] ?? '';
+        $style = $guidance === '' ? '' : "\nDesign style guidance (lower priority than the brief's exact copy/colors and the system rules):\n{$guidance}";
+
+        return "Brief: {$brief->prompt}\nCanvas: {$brief->width}x{$brief->height}px\nBrand color: {$brief->accentColor}{$style}";
     }
 
     /**

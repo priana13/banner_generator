@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { DesignStyleManager } from '@/components/editor/design-style-manager';
 import type { GenerationBrief } from '@/hooks/use-generation';
 import { api, errorMessage } from '@/lib/api';
 import { removeBackground } from '@/lib/background-removal';
@@ -27,6 +28,7 @@ import type {
     BannerStyle,
     EditorAsset,
     EditorPayload,
+    DesignStyle,
     PromptPreset,
 } from '@/types';
 
@@ -161,17 +163,22 @@ export function GeneratorPanel({
     generation,
     brief,
     maxPromptLength,
+    fonts,
 }: {
     projectId: number;
     generation: Generation;
     brief: EditorPayload['brief'];
     maxPromptLength: number;
+    fonts: string[];
 }) {
     const canvas = useEditorStore((state) => state.document.canvas);
     const accent = useEditorStore((state) => state.accent);
     const setAccent = useEditorStore((state) => state.setAccent);
     const setCanvas = useEditorStore((state) => state.setCanvas);
     const [prompt, setPrompt] = useState(brief?.prompt ?? '');
+    const [designStyles, setDesignStyles] = useState<DesignStyle[]>([]);
+    const [designStyle, setDesignStyle] = useState(brief?.design_style ?? '');
+    const [styleLoadError, setStyleLoadError] = useState(false);
     const [style, setStyle] = useState<BannerStyle>(brief?.style ?? 'cutout');
     const [photo, setPhoto] = useState<EditorAsset | null>(null);
     const [logo, setLogo] = useState<EditorAsset | null>(null);
@@ -197,6 +204,39 @@ export function GeneratorPanel({
         };
     }, []);
 
+    const updateDesignStyles = (data: DesignStyle[]) => {
+        setDesignStyles(data);
+        setDesignStyle((current) =>
+            data.some((item) => item.key === current) ? current : '',
+        );
+    };
+    useEffect(() => {
+        let cancelled = false;
+        api<{ data: DesignStyle[] }>({
+            url: '/api/design-styles',
+            method: 'get',
+        })
+            .then(({ data }) => {
+                if (!cancelled) {
+                    setDesignStyles(data);
+                    setDesignStyle((current) =>
+                        data.some((item) => item.key === current)
+                            ? current
+                            : '',
+                    );
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setStyleLoadError(true);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+    const selectedDesignStyle = designStyles.find(
+        (item) => item.key === designStyle,
+    );
+
     const size = `${canvas.width}x${canvas.height}`;
     const isPreset = CANVAS_PRESETS.some(
         (preset) => `${preset.width}x${preset.height}` === size,
@@ -209,6 +249,7 @@ export function GeneratorPanel({
         prompt: string;
         primary_color?: unknown;
         style?: unknown;
+        design_style?: unknown;
         width?: unknown;
         height?: unknown;
     }): void => {
@@ -223,6 +264,17 @@ export function GeneratorPanel({
 
         if (isStyle(values.style)) {
             setStyle(values.style);
+        }
+
+        if ('design_style' in values) {
+            setDesignStyle(
+                typeof values.design_style === 'string' &&
+                    designStyles.some(
+                        (item) => item.key === values.design_style,
+                    )
+                    ? values.design_style
+                    : '',
+            );
         }
 
         const width = Number(values.width);
@@ -256,6 +308,7 @@ export function GeneratorPanel({
                 prompt: prompt.trim(),
                 primary_color: accent,
                 style,
+                design_style: designStyle || null,
             });
 
             setPresets((current) =>
@@ -301,6 +354,7 @@ export function GeneratorPanel({
                     prompt: prompt.trim(),
                     primary_color: accent,
                     style,
+                    design_style: designStyle || null,
                     width: canvas.width,
                     height: canvas.height,
                 },
@@ -448,10 +502,65 @@ export function GeneratorPanel({
 
             <div className="mt-4">
                 <label
-                    htmlFor="banner-style"
+                    htmlFor="design-style"
                     className="text-xs font-semibold text-slate-600"
                 >
                     Gaya desain
+                </label>
+                <select
+                    id="design-style"
+                    value={designStyle}
+                    disabled={generation.busy}
+                    onChange={(event) => setDesignStyle(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm"
+                >
+                    <option value="">Otomatis — ikuti brief</option>
+                    <optgroup label="Gaya bawaan">
+                        {designStyles
+                            .filter((item) => item.builtin)
+                            .map((item) => (
+                                <option key={item.key} value={item.key}>
+                                    {item.name}
+                                </option>
+                            ))}
+                    </optgroup>
+                    <optgroup label="Gaya saya">
+                        {designStyles
+                            .filter((item) => !item.builtin)
+                            .map((item) => (
+                                <option key={item.key} value={item.key}>
+                                    {item.name}
+                                </option>
+                            ))}
+                    </optgroup>
+                </select>
+                {selectedDesignStyle && (
+                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                        {selectedDesignStyle.description ||
+                            'Panduan teks, gambar, dan dekorasi kustom.'}
+                    </p>
+                )}
+                {styleLoadError && (
+                    <p role="status" className="mt-2 text-xs text-red-600">
+                        Gagal memuat gaya. Muat ulang halaman untuk mencoba
+                        lagi.
+                    </p>
+                )}
+                <DesignStyleManager
+                    styles={designStyles}
+                    fonts={fonts}
+                    onChange={updateDesignStyles}
+                    onSelect={setDesignStyle}
+                    disabled={generation.busy}
+                />
+            </div>
+
+            <div className="mt-4">
+                <label
+                    htmlFor="banner-style"
+                    className="text-xs font-semibold text-slate-600"
+                >
+                    Mode komposisi
                 </label>
                 <select
                     id="banner-style"
@@ -580,6 +689,7 @@ export function GeneratorPanel({
                         photoAssetId: photo?.id ?? null,
                         logoAssetId: logo?.id ?? null,
                         style,
+                        designStyle: designStyle || null,
                     })
                 }
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 py-3 font-bold text-white shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"

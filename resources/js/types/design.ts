@@ -152,7 +152,20 @@ export type EditorPayload = {
         prompt: string;
         primary_color: string | null;
         style: BannerStyle | null;
+        design_style: string | null;
     } | null;
+};
+
+export type DesignStyle = {
+    id: number | null;
+    key: string;
+    builtin: boolean;
+    name: string;
+    description: string;
+    text_instructions: string;
+    image_instructions: string;
+    font: string | null;
+    ornaments: string[];
 };
 
 export type BannerStyle = 'cutout' | 'panel';
@@ -172,6 +185,7 @@ export type PromptPreset = {
     prompt: string;
     primary_color: string | null;
     style: BannerStyle | null;
+    design_style: string | null;
 };
 
 export type ProjectCategory = {
