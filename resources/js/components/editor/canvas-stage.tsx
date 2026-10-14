@@ -155,7 +155,6 @@ function SpansNode({
 
 function ElementNode({ element }: { element: DesignElement }) {
     const select = useEditorStore((state) => state.select);
-    const updateElement = useEditorStore((state) => state.updateElement);
 
     const common: Konva.NodeConfig = {
         id: element.id,
@@ -167,45 +166,17 @@ function ElementNode({ element }: { element: DesignElement }) {
         // Locked layers let clicks fall through to whatever is underneath.
         listening: !element.locked,
         draggable: !element.locked,
-        onMouseDown: () => select(element.id),
-        onTap: () => select(element.id),
-        onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) =>
-            updateElement(element.id, {
-                x: round(event.target.x()),
-                y: round(event.target.y()),
-            }),
-        onTransformEnd: (event: Konva.KonvaEventObject<Event>) => {
-            const node = event.target;
-            const scaleX = node.scaleX();
-            const scaleY = node.scaleY();
-
-            // Konva resizes by scaling; bake the scale into real dimensions
-            // so the document keeps absolute sizes.
-            node.scaleX(1);
-            node.scaleY(1);
-
-            const patch: ElementPatch = {
-                x: round(node.x()),
-                y: round(node.y()),
-                rotation: round(node.rotation()),
-                width: round(Math.max(MIN_SIZE, element.width * scaleX)),
-                height: round(Math.max(MIN_SIZE, element.height * scaleY)),
-            };
-
-            if (element.type === 'text') {
-                // Corners scale the type, the sides only re-wrap it.
-                const fontSize = Math.max(
-                    4,
-                    Math.round(element.fontSize * scaleY),
-                );
-
-                patch.fontSize = fontSize;
-                patch.height = round(
-                    (element.height / element.fontSize) * fontSize,
-                );
-            }
-
-            updateElement(element.id, patch);
+        onMouseDown: (event: Konva.KonvaEventObject<MouseEvent>) => {
+            if (event.evt.button !== 0) return;
+            if (event.evt.shiftKey) select(element.id, true);
+            else if (
+                !useEditorStore.getState().selectedIds.includes(element.id)
+            )
+                select(element.id);
+        },
+        onTap: () => {
+            if (!useEditorStore.getState().selectedIds.includes(element.id))
+                select(element.id);
         },
     };
 
@@ -301,25 +272,71 @@ export function CanvasStage({
     fonts: string[];
 }) {
     const document = useEditorStore((state) => state.document);
-    const selectedId = useEditorStore((state) => state.selectedId);
+    const selectedIds = useEditorStore((state) => state.selectedIds);
     const zoom = useEditorStore((state) => state.zoom);
     const select = useEditorStore((state) => state.select);
     const transformerRef = useRef<Konva.Transformer>(null);
     const fontsReady = useFontsReady(fonts);
 
     const { canvas, elements } = document;
-    const selected = elements.find((element) => element.id === selectedId);
-    const transformable = selected && !selected.locked && selected.visible;
+    const selected =
+        selectedIds.length === 1
+            ? elements.find((element) => element.id === selectedIds[0])
+            : undefined;
 
     useEffect(() => {
         const transformer = transformerRef.current;
-        const node = transformable
-            ? stageRef.current?.findOne(`#${selectedId}`)
-            : undefined;
-
-        transformer?.nodes(node ? [node] : []);
+        const nodes = elements
+            .filter(
+                (element) =>
+                    selectedIds.includes(element.id) &&
+                    !element.locked &&
+                    element.visible,
+            )
+            .map((element) => stageRef.current?.findOne(`#${element.id}`))
+            .filter((node): node is Konva.Node => node !== undefined);
+        transformer?.nodes(nodes);
         transformer?.getLayer()?.batchDraw();
-    }, [selectedId, transformable, document, fontsReady, stageRef]);
+    }, [selectedIds, document, fontsReady, stageRef]);
+
+    const savePositions = (): void => {
+        const patches: Record<string, ElementPatch> = {};
+        for (const node of transformerRef.current?.nodes() ?? []) {
+            patches[node.id()] = { x: round(node.x()), y: round(node.y()) };
+        }
+        useEditorStore.getState().updateElements(patches);
+    };
+    const saveTransform = (): void => {
+        const patches: Record<string, ElementPatch> = {};
+        const originals = useEditorStore.getState().document.elements;
+        for (const node of transformerRef.current?.nodes() ?? []) {
+            const element = originals.find((item) => item.id === node.id());
+            if (!element) continue;
+            const scaleX = node.scaleX();
+            const scaleY = node.scaleY();
+            const patch: ElementPatch = {
+                x: round(node.x()),
+                y: round(node.y()),
+                rotation: round(node.rotation()),
+                width: round(Math.max(MIN_SIZE, element.width * scaleX)),
+                height: round(Math.max(MIN_SIZE, element.height * scaleY)),
+            };
+            if (element.type === 'text') {
+                const fontSize = Math.max(
+                    4,
+                    Math.round(element.fontSize * scaleY),
+                );
+                patch.fontSize = fontSize;
+                patch.height = round(
+                    (element.height / element.fontSize) * fontSize,
+                );
+            }
+            node.scaleX(1);
+            node.scaleY(1);
+            patches[element.id] = patch;
+        }
+        useEditorStore.getState().updateElements(patches);
+    };
 
     return (
         <Stage
@@ -328,6 +345,15 @@ export function CanvasStage({
             height={canvas.height * zoom}
             scaleX={zoom}
             scaleY={zoom}
+            onDragEnd={(event) => {
+                if (
+                    useEditorStore
+                        .getState()
+                        .selectedIds.includes(event.target.id()) ||
+                    event.target.getClassName() === 'Transformer'
+                )
+                    savePositions();
+            }}
             onMouseDown={(event) => {
                 if (event.target.name() === 'background') {
                     select(null);
@@ -352,15 +378,18 @@ export function CanvasStage({
                 ))}
                 <Transformer
                     ref={transformerRef}
+                    onTransformEnd={saveTransform}
                     flipEnabled={false}
                     rotationSnaps={[0, 90, 180, 270]}
                     anchorStroke="#f97316"
                     borderStroke="#f97316"
                     anchorCornerRadius={3}
                     enabledAnchors={
-                        selected?.type === 'text'
-                            ? [...SIDE_ANCHORS, ...CORNER_ANCHORS]
-                            : undefined
+                        selectedIds.length > 1
+                            ? CORNER_ANCHORS
+                            : selected?.type === 'text'
+                              ? [...SIDE_ANCHORS, ...CORNER_ANCHORS]
+                              : undefined
                     }
                     boundBoxFunc={(oldBox, newBox) =>
                         Math.abs(newBox.width) < MIN_SIZE ||

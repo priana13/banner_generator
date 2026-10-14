@@ -22,7 +22,7 @@ type EditorState = {
     version: number;
     saveStatus: SaveStatus;
     assets: Record<string, EditorAsset>;
-    selectedId: string | null;
+    selectedIds: string[];
     past: DesignDocument[];
     future: DesignDocument[];
     accent: string;
@@ -41,7 +41,13 @@ type EditorState = {
     ) => void;
     markSaved: (document: DesignDocument, version: number) => void;
     setSaveStatus: (status: SaveStatus) => void;
-    select: (id: string | null) => void;
+    select: (id: string | null, additive?: boolean) => void;
+    selectAll: () => void;
+    duplicateElements: (ids: string[]) => string[];
+    duplicateSelected: () => void;
+    removeElements: (ids: string[]) => void;
+    removeSelected: () => void;
+    updateElements: (patches: Record<string, ElementPatch>) => void;
     addAsset: (asset: EditorAsset) => void;
     addElement: (element: DesignElement) => void;
     duplicateElement: (id: string) => string | null;
@@ -132,7 +138,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         version: 0,
         saveStatus: 'saved',
         assets: {},
-        selectedId: null,
+        selectedIds: [],
         past: [],
         future: [],
         accent: '#f97316',
@@ -147,7 +153,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
                 version,
                 saveStatus: 'saved',
                 assets: indexAssets(assets),
-                selectedId: null,
+                selectedIds: [],
                 past: [],
                 future: [],
             });
@@ -162,7 +168,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
                 version,
                 saveStatus: 'saved',
                 assets: indexAssets(assets),
-                selectedId: null,
+                selectedIds: [],
             });
         },
 
@@ -175,7 +181,29 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
         setSaveStatus: (saveStatus) => set({ saveStatus }),
 
-        select: (selectedId) => set({ selectedId }),
+        select: (id, additive = false) => {
+            if (id === null) {
+                set({ selectedIds: [] });
+                return;
+            }
+            if (!get().document.elements.some((element) => element.id === id))
+                return;
+            set((state) => ({
+                selectedIds: additive
+                    ? state.selectedIds.includes(id)
+                        ? state.selectedIds.filter((value) => value !== id)
+                        : [...state.selectedIds, id]
+                    : [id],
+            }));
+        },
+        selectAll: () =>
+            set({
+                selectedIds: get()
+                    .document.elements.filter(
+                        (element) => element.visible && !element.locked,
+                    )
+                    .map((element) => element.id),
+            }),
 
         addAsset: (asset) =>
             set((state) => ({
@@ -184,20 +212,21 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
         addElement: (element) => {
             mapElements((elements) => [...elements, element]);
-            set({ selectedId: element.id });
+            set({ selectedIds: [element.id] });
         },
 
-        duplicateElement: (id) => {
+        duplicateElement: (id) => get().duplicateElements([id])[0] ?? null,
+        duplicateSelected: () => {
+            get().duplicateElements(get().selectedIds);
+        },
+        duplicateElements: (ids) => {
             const { document } = get();
-            const index = document.elements.findIndex(
-                (element) => element.id === id,
+            const selected = new Set(ids);
+            const sources = document.elements.filter((element) =>
+                selected.has(element.id),
             );
-            if (index < 0) {
-                return null;
-            }
-
-            const source = document.elements[index];
-            const copy: DesignElement = {
+            if (sources.length === 0) return [];
+            const copies = sources.map((source): DesignElement => ({
                 ...structuredClone(source),
                 id: uid(),
                 name: `${Array.from(
@@ -208,16 +237,34 @@ export const useEditorStore = create<EditorState>((set, get) => {
                 x: Math.min(20000, source.x + 20),
                 y: Math.min(20000, source.y + 20),
                 locked: false,
-            };
-            // Place the copy directly above its source in the layer stack.
+            }));
+            const index = document.elements.findIndex(
+                (element) => element.id === sources.at(-1)?.id,
+            );
             mapElements((elements) => [
                 ...elements.slice(0, index + 1),
-                copy,
+                ...copies,
                 ...elements.slice(index + 1),
             ]);
-            set({ selectedId: copy.id });
-
-            return copy.id;
+            const copyIds = copies.map((copy) => copy.id);
+            set({ selectedIds: copyIds });
+            return copyIds;
+        },
+        updateElements: (patches) => {
+            let changed = false;
+            const elements = get().document.elements.map((element) => {
+                const patch = patches[element.id];
+                if (
+                    !patch ||
+                    !Object.entries(patch).some(
+                        ([key, value]) => Reflect.get(element, key) !== value,
+                    )
+                )
+                    return element;
+                changed = true;
+                return { ...element, ...patch } as DesignElement;
+            });
+            if (changed) commit({ ...get().document, elements });
         },
 
         updateElement: (id, patch, coalesceKey) =>
@@ -231,12 +278,17 @@ export const useEditorStore = create<EditorState>((set, get) => {
                 coalesceKey,
             ),
 
-        removeElement: (id) => {
-            mapElements((elements) =>
-                elements.filter((element) => element.id !== id),
+        removeElement: (id) => get().removeElements([id]),
+        removeSelected: () => get().removeElements(get().selectedIds),
+        removeElements: (ids) => {
+            const removed = new Set(ids);
+            const elements = get().document.elements.filter(
+                (element) => !removed.has(element.id),
             );
+            if (elements.length === get().document.elements.length) return;
+            commit({ ...get().document, elements });
             set((state) => ({
-                selectedId: state.selectedId === id ? null : state.selectedId,
+                selectedIds: state.selectedIds.filter((id) => !removed.has(id)),
             }));
         },
 
@@ -267,7 +319,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         },
 
         undo: () => {
-            const { past, future, document, selectedId } = get();
+            const { past, future, document, selectedIds } = get();
             const previous = past.at(-1);
 
             if (!previous) {
@@ -279,14 +331,14 @@ export const useEditorStore = create<EditorState>((set, get) => {
                 document: previous,
                 past: past.slice(0, -1),
                 future: [document, ...future],
-                selectedId: previous.elements.some((el) => el.id === selectedId)
-                    ? selectedId
-                    : null,
+                selectedIds: selectedIds.filter((id) =>
+                    previous.elements.some((element) => element.id === id),
+                ),
             });
         },
 
         redo: () => {
-            const { past, future, document, selectedId } = get();
+            const { past, future, document, selectedIds } = get();
             const next = future.at(0);
 
             if (!next) {
@@ -298,9 +350,9 @@ export const useEditorStore = create<EditorState>((set, get) => {
                 document: next,
                 past: [...past, document],
                 future: future.slice(1),
-                selectedId: next.elements.some((el) => el.id === selectedId)
-                    ? selectedId
-                    : null,
+                selectedIds: selectedIds.filter((id) =>
+                    next.elements.some((element) => element.id === id),
+                ),
             });
         },
 
@@ -359,10 +411,11 @@ export const useEditorStore = create<EditorState>((set, get) => {
 });
 
 export function useSelectedElement(): DesignElement | null {
-    return useEditorStore(
-        (state) =>
-            state.document.elements.find(
-                (element) => element.id === state.selectedId,
-            ) ?? null,
+    return useEditorStore((state) =>
+        state.selectedIds.length === 1
+            ? (state.document.elements.find(
+                  (element) => element.id === state.selectedIds[0],
+              ) ?? null)
+            : null,
     );
 }

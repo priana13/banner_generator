@@ -156,19 +156,22 @@ export default function Editor({
                 modifier &&
                 !event.altKey &&
                 key === 'd' &&
-                state.selectedId
+                state.selectedIds.length > 0
             ) {
                 event.preventDefault();
-                if (!event.repeat) state.duplicateElement(state.selectedId);
+                if (!event.repeat) state.duplicateSelected();
+            } else if (modifier && key === 'a') {
+                event.preventDefault();
+                state.selectAll();
             } else if (modifier && key === 's') {
                 event.preventDefault();
                 void saveDocument(project.id);
             } else if (
                 (event.key === 'Delete' || event.key === 'Backspace') &&
-                state.selectedId
+                state.selectedIds.length > 0
             ) {
                 event.preventDefault();
-                state.removeElement(state.selectedId);
+                state.removeSelected();
             } else if (event.key === 'Escape') {
                 state.select(null);
             }

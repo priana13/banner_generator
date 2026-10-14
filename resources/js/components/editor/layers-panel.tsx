@@ -356,10 +356,13 @@ export function ElementsPanel({ projectId }: { projectId: number }) {
 
 export function LayersPanel() {
     const elements = useEditorStore((state) => state.document.elements);
-    const selectedId = useEditorStore((state) => state.selectedId);
+    const selectedIds = useEditorStore((state) => state.selectedIds);
     const select = useEditorStore((state) => state.select);
     const updateElement = useEditorStore((state) => state.updateElement);
-    const removeElement = useEditorStore((state) => state.removeElement);
+    const removeSelected = useEditorStore((state) => state.removeSelected);
+    const duplicateSelected = useEditorStore(
+        (state) => state.duplicateSelected,
+    );
     const duplicateElement = useEditorStore((state) => state.duplicateElement);
 
     return (
@@ -368,12 +371,26 @@ export function LayersPanel() {
                 <h3 className="text-sm font-bold">Layer</h3>
                 <button
                     type="button"
-                    disabled={!selectedId}
-                    onClick={() => selectedId && removeElement(selectedId)}
+                    disabled={selectedIds.length === 0}
+                    onClick={removeSelected}
                     className="inline-flex items-center gap-1 text-xs text-red-500 hover:underline disabled:opacity-40"
                 >
                     <Trash2 className="size-3" />
                     Hapus terpilih
+                </button>
+            </div>
+            <div className="mb-3 flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-400">
+                    Shift+klik untuk pilih banyak ({selectedIds.length})
+                </span>
+                <button
+                    type="button"
+                    onClick={duplicateSelected}
+                    disabled={selectedIds.length === 0}
+                    className="inline-flex shrink-0 items-center gap-1 font-semibold text-orange-600 disabled:opacity-40"
+                >
+                    <Copy className="size-3" />
+                    Duplikat
                 </button>
             </div>
             {elements.length === 0 && (
@@ -391,14 +408,17 @@ export function LayersPanel() {
                             key={element.id}
                             className={cn(
                                 'flex items-center rounded-lg border',
-                                element.id === selectedId
+                                selectedIds.includes(element.id)
                                     ? 'border-orange-400 bg-orange-50'
                                     : 'border-slate-100 hover:bg-orange-50',
                             )}
                         >
                             <button
                                 type="button"
-                                onClick={() => select(element.id)}
+                                onClick={(event) =>
+                                    select(element.id, event.shiftKey)
+                                }
+                                aria-pressed={selectedIds.includes(element.id)}
                                 className={cn(
                                     'flex min-w-0 flex-1 items-center gap-2 p-2.5 text-left',
                                     !element.visible && 'opacity-50',

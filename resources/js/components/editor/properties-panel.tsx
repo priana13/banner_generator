@@ -7,6 +7,7 @@ import {
     ArrowRight,
     ArrowUp,
     Copy,
+    Trash2,
     Eraser,
     LoaderCircle,
 } from 'lucide-react';
@@ -279,6 +280,11 @@ export function PropertiesPanel({
     projectId: number;
 }) {
     const element = useSelectedElement();
+    const selectedIds = useEditorStore((state) => state.selectedIds);
+    const duplicateSelected = useEditorStore(
+        (state) => state.duplicateSelected,
+    );
+    const removeSelected = useEditorStore((state) => state.removeSelected);
     const canvas = useEditorStore((state) => state.document.canvas);
     const updateElement = useEditorStore((state) => state.updateElement);
     const reorderElement = useEditorStore((state) => state.reorderElement);
@@ -286,6 +292,37 @@ export function PropertiesPanel({
     const setCanvas = useEditorStore((state) => state.setCanvas);
     const accent = useEditorStore((state) => state.accent);
 
+    if (selectedIds.length > 1) {
+        return (
+            <div className="space-y-4 p-5">
+                <h3 className="text-sm font-bold">
+                    {selectedIds.length} elemen dipilih
+                </h3>
+                <p className="text-xs leading-relaxed text-slate-500">
+                    Shift+klik untuk menambah atau melepas pilihan. Seret salah
+                    satu elemen untuk memindahkan bersama; gunakan gagang untuk
+                    mengubah ukuran atau memutar. Layer terkunci tidak ikut
+                    bergerak.
+                </p>
+                <button
+                    type="button"
+                    onClick={duplicateSelected}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-orange-200 p-2 text-xs font-semibold text-orange-600 hover:bg-orange-50"
+                >
+                    <Copy className="size-4" />
+                    Duplikat terpilih (Ctrl+D / ⌘D)
+                </button>
+                <button
+                    type="button"
+                    onClick={removeSelected}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 p-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                >
+                    <Trash2 className="size-4" />
+                    Hapus terpilih
+                </button>
+            </div>
+        );
+    }
     if (!element) {
         return (
             <>
