@@ -6,6 +6,7 @@ import {
     ArrowLeft,
     ArrowRight,
     ArrowUp,
+    Copy,
     Eraser,
     LoaderCircle,
 } from 'lucide-react';
@@ -281,6 +282,7 @@ export function PropertiesPanel({
     const canvas = useEditorStore((state) => state.document.canvas);
     const updateElement = useEditorStore((state) => state.updateElement);
     const reorderElement = useEditorStore((state) => state.reorderElement);
+    const duplicateElement = useEditorStore((state) => state.duplicateElement);
     const setCanvas = useEditorStore((state) => state.setCanvas);
     const accent = useEditorStore((state) => state.accent);
 
@@ -329,7 +331,18 @@ export function PropertiesPanel({
     return (
         <>
             <div className="border-b border-slate-200 p-5">
-                <h3 className="text-sm font-bold">Properti Elemen</h3>
+                <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold">Properti Elemen</h3>
+                    <button
+                        type="button"
+                        onClick={() => duplicateElement(element.id)}
+                        title="Duplikat elemen (Ctrl+D / ⌘D)"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-orange-600 hover:bg-orange-50"
+                    >
+                        <Copy className="size-3.5" />
+                        Duplikat
+                    </button>
+                </div>
                 <input
                     value={element.name}
                     maxLength={80}

@@ -152,6 +152,14 @@ export default function Editor({
             } else if (modifier && key === 'y') {
                 event.preventDefault();
                 state.redo();
+            } else if (
+                modifier &&
+                !event.altKey &&
+                key === 'd' &&
+                state.selectedId
+            ) {
+                event.preventDefault();
+                if (!event.repeat) state.duplicateElement(state.selectedId);
             } else if (modifier && key === 's') {
                 event.preventDefault();
                 void saveDocument(project.id);

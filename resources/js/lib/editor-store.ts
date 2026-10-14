@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { uid } from '@/lib/editor-elements';
 import type {
     DesignCanvas,
     DesignDocument,
@@ -43,6 +44,7 @@ type EditorState = {
     select: (id: string | null) => void;
     addAsset: (asset: EditorAsset) => void;
     addElement: (element: DesignElement) => void;
+    duplicateElement: (id: string) => string | null;
     updateElement: (
         id: string,
         patch: ElementPatch,
@@ -183,6 +185,39 @@ export const useEditorStore = create<EditorState>((set, get) => {
         addElement: (element) => {
             mapElements((elements) => [...elements, element]);
             set({ selectedId: element.id });
+        },
+
+        duplicateElement: (id) => {
+            const { document } = get();
+            const index = document.elements.findIndex(
+                (element) => element.id === id,
+            );
+            if (index < 0) {
+                return null;
+            }
+
+            const source = document.elements[index];
+            const copy: DesignElement = {
+                ...structuredClone(source),
+                id: uid(),
+                name: `${Array.from(
+                    source.name.replace(/ \(salinan(?: \d+)?\)$/, ''),
+                )
+                    .slice(0, 70)
+                    .join('')} (salinan)`,
+                x: Math.min(20000, source.x + 20),
+                y: Math.min(20000, source.y + 20),
+                locked: false,
+            };
+            // Place the copy directly above its source in the layer stack.
+            mapElements((elements) => [
+                ...elements.slice(0, index + 1),
+                copy,
+                ...elements.slice(index + 1),
+            ]);
+            set({ selectedId: copy.id });
+
+            return copy.id;
         },
 
         updateElement: (id, patch, coalesceKey) =>

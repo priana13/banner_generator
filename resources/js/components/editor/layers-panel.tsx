@@ -1,5 +1,6 @@
 import {
     Circle,
+    Copy,
     Eye,
     EyeOff,
     Image as ImageIcon,
@@ -359,6 +360,7 @@ export function LayersPanel() {
     const select = useEditorStore((state) => state.select);
     const updateElement = useEditorStore((state) => state.updateElement);
     const removeElement = useEditorStore((state) => state.removeElement);
+    const duplicateElement = useEditorStore((state) => state.duplicateElement);
 
     return (
         <div className="p-5">
@@ -404,6 +406,15 @@ export function LayersPanel() {
                             >
                                 <Icon className="size-3.5 shrink-0 text-slate-500" />
                                 <span className="truncate">{element.name}</span>
+                            </button>
+                            <button
+                                type="button"
+                                title="Duplikat elemen (Ctrl+D / ⌘D)"
+                                aria-label={`Duplikat ${element.name}`}
+                                onClick={() => duplicateElement(element.id)}
+                                className="p-1.5 text-slate-400 hover:text-orange-600"
+                            >
+                                <Copy className="size-3.5" />
                             </button>
                             <button
                                 type="button"
