@@ -4,6 +4,7 @@ namespace App\Services\Ai\Providers;
 
 use App\Services\Ai\AiProviderException;
 use App\Services\Ai\Contracts\ImageProvider;
+use App\Services\Ai\GeminiErrors;
 use App\Services\Ai\GeneratedImage;
 use App\Services\Ai\ImageRequest;
 use App\Services\Ai\ImageTools;
@@ -60,12 +61,7 @@ class GeminiImageProvider implements ImageProvider
         }
 
         if ($response->failed()) {
-            throw new AiProviderException(match ($response->status()) {
-                401, 403 => 'Kredensial gambar Gemini ditolak. Periksa API key dan izin proyek Google AI Studio.',
-                429 => 'Gemini sedang membatasi permintaan gambar atau kuota habis. Coba lagi beberapa saat lagi.',
-                400, 404 => 'Permintaan gambar Gemini ditolak. Periksa nama model gambar, API key, atau ubah deskripsi banner.',
-                default => "Penyedia gambar Gemini mengembalikan galat (HTTP {$response->status()}).",
-            });
+            throw new AiProviderException(GeminiErrors::message($response, $this->model(), true));
         }
 
         $parts = $response->json('candidates.0.content.parts', []);

@@ -17,7 +17,7 @@ function aiSettingsPayload(): array
     return [
         'layout_provider' => 'gemini', 'image_provider' => 'local',
         'gemini_image_model' => 'gemini-2.5-flash-image',
-        'gemini_model' => 'gemini-2.5-flash', 'gemini_api_key' => 'gemini-secret',
+        'gemini_model' => 'gemini-3.1-flash-lite', 'gemini_api_key' => 'gemini-secret',
         'openai_base_url' => 'https://api.openai.com/v1',
         'openai_layout_model' => 'gpt-4o-mini', 'openai_image_model' => 'gpt-image-1',
         'openai_api_key' => '',
@@ -135,10 +135,28 @@ test('Gemini image failures never expose provider response secrets', function ($
 })->with([
     'quota' => [['error' => ['message' => 'secret']], 429, 'kuota'],
     'credentials' => [['error' => ['message' => 'secret']], 403, 'Kredensial'],
-    'model' => [['error' => ['message' => 'secret']], 404, 'nama model'],
+    'model' => [['error' => ['message' => 'secret']], 404, 'tidak tersedia'],
     'blocked' => [['promptFeedback' => ['blockReason' => 'SAFETY']], 200, 'diblokir'],
     'text only' => [['candidates' => [['content' => ['parts' => [['text' => 'secret']]]]]], 200, 'tidak mengembalikan gambar'],
     'invalid base64' => [['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => '!!!']]]]]]], 200, 'data gambar'],
     'invalid image' => [['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => base64_encode('not an image')]]]]]]], 200, 'tidak dapat dibaca'],
     'unsupported format' => [['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'text/html', 'data' => base64_encode('secret')]]]]]]], 200, 'format gambar'],
+]);
+
+test('Gemini errors distinguish unavailable models, invalid keys, and temporary capacity', function ($payload, $status, $message) {
+    config(['banner.layout_provider' => 'gemini', 'banner.gemini.api_key' => 'secret']);
+    Http::fake(['*' => Http::response($payload, $status)]);
+    try {
+        app(LayoutProvider::class)->generate(new DesignBrief('Test', 1200, 400, '#f97316'));
+        $this->fail('Expected a provider error.');
+    } catch (AiProviderException $exception) {
+        expect($exception->getMessage())->toContain($message)->not->toContain('secret');
+    }
+})->with([
+    'retired model' => [['error' => ['message' => 'This model is no longer available to new users: secret']], 404, 'tidak tersedia'],
+    'invalid key' => [['error' => ['message' => 'secret', 'details' => [['reason' => 'API_KEY_INVALID']]]], 400, 'API key Gemini tidak valid'],
+    'invalid payload' => [['error' => ['message' => 'secret']], 400, 'format permintaan'],
+    'no image quota' => [['error' => ['message' => 'Quota exceeded, limit: 0, model: secret']], 429, 'aktifkan billing'],
+    'temporary quota' => [['error' => ['message' => 'Quota exceeded, limit: 10, model: secret']], 429, 'kuota habis'],
+    'busy' => [['error' => ['message' => 'high demand secret']], 503, 'sedang sibuk'],
 ]);

@@ -6,6 +6,7 @@ use App\Services\Ai\AiProviderException;
 use App\Services\Ai\Contracts\LayoutProvider;
 use App\Services\Ai\DesignBrief;
 use App\Services\Ai\DesignPrompt;
+use App\Services\Ai\GeminiErrors;
 use App\Services\Ai\LayoutResult;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -49,12 +50,7 @@ class GeminiLayoutProvider implements LayoutProvider
         }
 
         if ($response->failed()) {
-            throw new AiProviderException(match ($response->status()) {
-                401, 403 => 'Kredensial Gemini ditolak. Periksa API key dan izin proyek Google AI Studio.',
-                429 => 'Gemini sedang membatasi permintaan atau kuota habis. Coba lagi beberapa saat lagi.',
-                400, 404 => 'Permintaan Gemini ditolak. Periksa API key dan nama model di pengaturan AI Global.',
-                default => "Gemini mengembalikan galat (HTTP {$response->status()}).",
-            });
+            throw new AiProviderException(GeminiErrors::message($response, $this->model()));
         }
 
         $parts = $response->json('candidates.0.content.parts', []);

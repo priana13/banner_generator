@@ -19,7 +19,7 @@ return [
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
-        'layout_model' => (string) env('GEMINI_LAYOUT_MODEL', 'gemini-2.5-flash'),
+        'layout_model' => (string) env('GEMINI_LAYOUT_MODEL', 'gemini-3.1-flash-lite'),
         'image_model' => (string) env('GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
         'image_cost' => (float) env('GEMINI_IMAGE_COST', 0),
         'timeout' => (int) env('GEMINI_TIMEOUT', 90),
