@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\Ornament;
 use App\Models\Project;
 use App\Services\Design\AssetStore;
+use App\Services\Design\ImageLibrary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -32,7 +33,7 @@ class OrnamentController extends Controller
     /**
      * Add an image to the user's ornament library.
      */
-    public function store(StoreAssetRequest $request, AssetStore $assets): JsonResponse
+    public function store(StoreAssetRequest $request, AssetStore $assets, ImageLibrary $library): JsonResponse
     {
         $user = $request->user();
 
@@ -54,6 +55,8 @@ class OrnamentController extends Controller
             'width' => $info['width'],
             'height' => $info['height'],
         ]);
+
+        $library->rememberOrnament($ornament);
 
         return response()->json($ornament->toEditorArray(), 201);
     }

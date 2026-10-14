@@ -206,3 +206,14 @@ export type ProjectSummary = {
     document: DesignDocument | null;
     assets: EditorAsset[];
 };
+
+export type LibraryImage = {
+    id: string;
+    name: string;
+    kind: 'upload' | 'logo' | 'cutout';
+    url: string;
+    width: number;
+    height: number;
+    bytes: number;
+    created_at: string | null;
+};

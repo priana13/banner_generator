@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import ImageLibraryPicker from '@/components/image-library-picker';
+import { useLibraryImage } from '@/lib/image-library';
 import { DesignStyleManager } from '@/components/editor/design-style-manager';
 import type { GenerationBrief } from '@/hooks/use-generation';
 import { api, errorMessage } from '@/lib/api';
@@ -28,6 +30,7 @@ import type {
     BannerStyle,
     EditorAsset,
     EditorPayload,
+    LibraryImage,
     DesignStyle,
     PromptPreset,
 } from '@/types';
@@ -85,24 +88,38 @@ function BriefUpload({
 }) {
     const [status, setStatus] = useState<string | null>(null);
 
-    const upload = async (file: File): Promise<void> => {
+    const choose = async (image: LibraryImage): Promise<void> => {
         try {
-            if (removeBg) {
+            if (removeBg && kind === 'upload' && image.kind !== 'cutout') {
                 setStatus('Menghapus latar…');
+                const response = await fetch(image.url, {
+                    credentials: 'same-origin',
+                });
+                if (!response.ok)
+                    throw new Error('Gagal membaca gambar dari pustaka.');
+                const cutout = await removeBackground(await response.blob());
                 onChange(
                     await uploadImage(
                         projectId,
-                        await removeBackground(file),
+                        cutout,
                         'cutout',
-                        file.name.replace(/\.[^.]+$/, '') + '.png',
+                        image.name.replace(/\.[^.]+$/, '') + '.png',
                     ),
                 );
             } else {
-                setStatus('Mengunggah…');
-                onChange(await uploadImage(projectId, file, kind, file.name));
+                setStatus('Menambahkan gambar…');
+                onChange(
+                    await useLibraryImage(
+                        projectId,
+                        image,
+                        kind === 'logo'
+                            ? 'logo'
+                            : image.kind === 'cutout'
+                              ? 'cutout'
+                              : 'upload',
+                    ),
+                );
             }
-        } catch (error) {
-            toast.error(errorMessage(error));
         } finally {
             setStatus(null);
         }
@@ -132,29 +149,20 @@ function BriefUpload({
     }
 
     return (
-        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 p-2.5 text-xs text-slate-500 hover:bg-slate-50">
-            {status ? (
-                <LoaderCircle className="size-3.5 animate-spin" />
-            ) : (
-                <ImagePlus className="size-3.5" />
-            )}
-            {status ?? label}
-            <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
+        <ImageLibraryPicker title={label} uploadKind={kind} onChoose={choose}>
+            <button
+                type="button"
                 disabled={status !== null}
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-
-                    event.target.value = '';
-
-                    if (file) {
-                        void upload(file);
-                    }
-                }}
-            />
-        </label>
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 p-2.5 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+            >
+                {status ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                ) : (
+                    <ImagePlus className="size-3.5" />
+                )}
+                {status ?? label}
+            </button>
+        </ImageLibraryPicker>
     );
 }
 

@@ -67,6 +67,12 @@ class User extends Authenticatable
         return $this->hasMany(DesignStyle::class);
     }
 
+    /** @return HasMany<LibraryImage, $this> */
+    public function libraryImages(): HasMany
+    {
+        return $this->hasMany(LibraryImage::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

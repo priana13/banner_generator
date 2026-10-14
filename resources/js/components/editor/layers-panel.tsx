@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import ImageLibraryPicker from '@/components/image-library-picker';
+import { useLibraryImage } from '@/lib/image-library';
 import { api, errorMessage } from '@/lib/api';
 import {
     createCircle,
@@ -27,11 +29,7 @@ import {
     createText,
 } from '@/lib/editor-elements';
 import { useEditorStore } from '@/lib/editor-store';
-import {
-    prepareImage,
-    rasterizeSvg,
-    uploadImage,
-} from '@/lib/image-processing';
+import { prepareImage, rasterizeSvg } from '@/lib/image-processing';
 import { ORNAMENTS, ornamentUrl } from '@/lib/ornaments';
 import { cn } from '@/lib/utils';
 import {
@@ -40,7 +38,12 @@ import {
     store as storeOrnament,
 } from '@/routes/api/ornaments';
 import { use as ornamentUseRoute } from '@/routes/api/projects/ornaments';
-import type { DesignElement, EditorAsset, UserOrnament } from '@/types';
+import type {
+    DesignElement,
+    EditorAsset,
+    LibraryImage,
+    UserOrnament,
+} from '@/types';
 
 const TYPE_ICONS = {
     text: Type,
@@ -271,19 +274,9 @@ export function ElementsPanel({ projectId }: { projectId: number }) {
 
     const state = () => useEditorStore.getState();
 
-    const addImage = async (file: File): Promise<void> => {
-        try {
-            const asset = await uploadImage(
-                projectId,
-                file,
-                'upload',
-                file.name,
-            );
-
-            addElement(createImage(state().document.canvas, asset));
-        } catch (error) {
-            toast.error(errorMessage(error));
-        }
+    const addImage = async (image: LibraryImage): Promise<void> => {
+        const asset = await useLibraryImage(projectId, image);
+        addElement(createImage(state().document.canvas, asset));
     };
 
     return (
@@ -330,24 +323,12 @@ export function ElementsPanel({ projectId }: { projectId: number }) {
                     <Circle className="size-4" />
                     Lingkaran
                 </button>
-                <label className={toolClass}>
-                    <Upload className="size-4" />
-                    Upload Foto
-                    <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(event) => {
-                            const file = event.target.files?.[0];
-
-                            event.target.value = '';
-
-                            if (file) {
-                                void addImage(file);
-                            }
-                        }}
-                    />
-                </label>
+                <ImageLibraryPicker onChoose={addImage}>
+                    <button type="button" className={toolClass}>
+                        <ImageIcon className="size-4" />
+                        Gambar
+                    </button>
+                </ImageLibraryPicker>
             </div>
             <OrnamentPicker projectId={projectId} />
         </div>
