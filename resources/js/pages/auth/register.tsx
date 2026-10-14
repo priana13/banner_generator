@@ -16,7 +16,7 @@ type Props = {
 export default function Register({ passwordRules }: Props) {
     return (
         <>
-            <Head title="Register" />
+            <Head title="Daftar" />
             <Form
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
@@ -27,16 +27,17 @@ export default function Register({ passwordRules }: Props) {
                     <>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="name">Nama lengkap</Label>
                                 <Input
                                     id="name"
+                                    className="h-12 rounded-xl bg-slate-50 shadow-none"
                                     type="text"
                                     required
                                     autoFocus
                                     tabIndex={1}
                                     autoComplete="name"
                                     name="name"
-                                    placeholder="Full name"
+                                    placeholder="Nama lengkap"
                                 />
                                 <InputError
                                     message={errors.name}
@@ -45,9 +46,10 @@ export default function Register({ passwordRules }: Props) {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                                <Label htmlFor="email">Alamat email</Label>
                                 <Input
                                     id="email"
+                                    className="h-12 rounded-xl bg-slate-50 shadow-none"
                                     type="email"
                                     required
                                     tabIndex={2}
@@ -59,14 +61,15 @@ export default function Register({ passwordRules }: Props) {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="password">Password</Label>
+                                <Label htmlFor="password">Kata sandi</Label>
                                 <PasswordInput
+                                    className="h-12 rounded-xl bg-slate-50 shadow-none"
                                     id="password"
                                     required
                                     tabIndex={3}
                                     autoComplete="new-password"
                                     name="password"
-                                    placeholder="Password"
+                                    placeholder="Masukkan kata sandi"
                                     passwordrules={passwordRules}
                                 />
                                 <InputError message={errors.password} />
@@ -74,15 +77,16 @@ export default function Register({ passwordRules }: Props) {
 
                             <div className="grid gap-2">
                                 <Label htmlFor="password_confirmation">
-                                    Confirm password
+                                    Konfirmasi kata sandi
                                 </Label>
                                 <PasswordInput
+                                    className="h-12 rounded-xl bg-slate-50 shadow-none"
                                     id="password_confirmation"
                                     required
                                     tabIndex={4}
                                     autoComplete="new-password"
                                     name="password_confirmation"
-                                    placeholder="Confirm password"
+                                    placeholder="Konfirmasi kata sandi"
                                     passwordrules={passwordRules}
                                 />
                                 <InputError
@@ -92,19 +96,24 @@ export default function Register({ passwordRules }: Props) {
 
                             <Button
                                 type="submit"
-                                className="mt-2 w-full"
+                                className="mt-2 h-12 w-full rounded-xl bg-orange-600 font-semibold text-white hover:bg-orange-700"
                                 tabIndex={5}
+                                disabled={processing}
                                 data-test="register-user-button"
                             >
                                 {processing && <Spinner />}
-                                Create account
+                                Buat akun
                             </Button>
                         </div>
 
                         <div className="text-center text-sm text-muted-foreground">
-                            Already have an account?{' '}
-                            <TextLink href={login()} tabIndex={6}>
-                                Log in
+                            Sudah punya akun?{' '}
+                            <TextLink
+                                href={login()}
+                                tabIndex={6}
+                                className="font-semibold text-orange-700 hover:text-orange-800"
+                            >
+                                Masuk
                             </TextLink>
                         </div>
                     </>
@@ -115,6 +124,6 @@ export default function Register({ passwordRules }: Props) {
 }
 
 Register.layout = {
-    title: 'Create an account',
-    description: 'Enter your details below to create your account',
+    title: 'Mulai ide pertamamu.',
+    description: 'Buat akun untuk menyimpan proyek dan mulai mendesain banner.',
 };
