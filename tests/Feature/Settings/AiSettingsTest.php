@@ -29,6 +29,15 @@ test('AI settings require authentication', function () {
     $this->put('/settings/ai', aiSettingsPayload())->assertRedirect('/login');
 });
 
+test('global AI settings retain their explicit singleton ID when first saved', function () {
+    // MySQL returns 0 from lastInsertId for a non-auto-increment column.
+    // Eloquent must retain the explicitly assigned ID rather than replacing it.
+    expect((new AiSetting)->getIncrementing())->toBeFalse();
+    $row = AiSetting::query()->firstOrCreate(['id' => 1], ['settings' => []]);
+    expect($row->id)->toBe(1)
+        ->and(AiSetting::query()->findOrFail($row->id)->id)->toBe(1);
+});
+
 test('global AI settings are encrypted and apply to another user without exposing keys', function () {
     $this->withoutVite();
     $this->actingAs(User::factory()->create())->put('/settings/ai', aiSettingsPayload())->assertRedirect('/settings/ai');
