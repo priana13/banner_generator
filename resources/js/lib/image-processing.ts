@@ -72,6 +72,40 @@ export async function prepareImage(source: Blob): Promise<Blob> {
 }
 
 /**
+ * Turn an SVG file into a PNG. The server never accepts SVG (it can carry
+ * scripts); drawn through an <img> it is inert, and only pixels are kept.
+ */
+export async function rasterizeSvg(file: Blob): Promise<Blob> {
+    const url = URL.createObjectURL(
+        new Blob([await file.text()], { type: 'image/svg+xml' }),
+    );
+
+    try {
+        const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const element = new Image();
+
+            element.onload = () => resolve(element);
+            element.onerror = () =>
+                reject(new Error('Berkas SVG tidak dapat dibaca.'));
+            element.src = url;
+        });
+
+        // An SVG without explicit dimensions reports none: fall back to a
+        // square, which the user can resize on the canvas.
+        const width = image.naturalWidth || 1024;
+        const height = image.naturalHeight || 1024;
+        const scale = MAX_SIDE / Math.max(width, height);
+
+        return await toBlob(
+            draw(image, width * scale, height * scale),
+            'image/png',
+        );
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+}
+
+/**
  * Crop away fully transparent margins, so a cutout's box hugs its subject.
  */
 export function trimTransparent(canvas: HTMLCanvasElement): HTMLCanvasElement {

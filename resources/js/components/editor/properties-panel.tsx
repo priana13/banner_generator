@@ -47,7 +47,8 @@ function RemoveBackgroundButton({
     const asset = useEditorStore((state) => state.assets[element.assetId]);
     const [working, setWorking] = useState(false);
 
-    if (!asset || asset.kind === 'cutout') {
+    // Cutouts are done already; ornaments are artwork, not photos.
+    if (!asset || asset.kind === 'cutout' || asset.kind === 'ornament') {
         return null;
     }
 

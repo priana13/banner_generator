@@ -26,6 +26,28 @@ class AssetStore
         ]);
     }
 
+    /**
+     * Read the real type and size of image bytes; anything that is not a
+     * supported raster image (including SVG) is rejected.
+     *
+     * @return array{mime: string, extension: string, width: int, height: int}
+     */
+    public function inspect(string $binary): array
+    {
+        $info = @getimagesizefromstring($binary);
+
+        if ($info === false || ! isset(self::EXTENSIONS[$info['mime']])) {
+            throw new RuntimeException('Unsupported image data.');
+        }
+
+        return [
+            'mime' => $info['mime'],
+            'extension' => self::EXTENSIONS[$info['mime']],
+            'width' => $info[0],
+            'height' => $info[1],
+        ];
+    }
+
     public function delete(Asset $asset): void
     {
         $this->disk()->delete($asset->storage_key);
@@ -40,13 +62,8 @@ class AssetStore
      */
     public function store(Project $project, string $binary, string $kind, array $metadata = []): Asset
     {
-        $info = @getimagesizefromstring($binary);
-
-        if ($info === false || ! isset(self::EXTENSIONS[$info['mime']])) {
-            throw new RuntimeException('Unsupported image data.');
-        }
-
-        $key = sprintf('projects/%d/%s.%s', $project->id, Str::uuid(), self::EXTENSIONS[$info['mime']]);
+        $info = $this->inspect($binary);
+        $key = sprintf('projects/%d/%s.%s', $project->id, Str::uuid(), $info['extension']);
 
         $this->disk()->put($key, $binary);
 
@@ -55,8 +72,8 @@ class AssetStore
             'kind' => $kind,
             'storage_key' => $key,
             'mime_type' => $info['mime'],
-            'width' => $info[0],
-            'height' => $info[1],
+            'width' => $info['width'],
+            'height' => $info['height'],
             'metadata_json' => $metadata + ['bytes' => strlen($binary)],
         ]);
     }

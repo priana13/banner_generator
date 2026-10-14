@@ -97,7 +97,7 @@ export type DesignDocument = {
 
 export type EditorAsset = {
     id: string;
-    kind: 'upload' | 'logo' | 'cutout' | 'generated';
+    kind: 'upload' | 'logo' | 'cutout' | 'generated' | 'ornament';
     url: string;
     width: number;
     height: number;
@@ -130,6 +130,15 @@ export type EditorPayload = {
 };
 
 export type BannerStyle = 'cutout' | 'panel';
+
+/** An image in the user's personal ornament library. */
+export type UserOrnament = {
+    id: string;
+    name: string;
+    url: string;
+    width: number;
+    height: number;
+};
 
 export type PromptPreset = {
     id: number;

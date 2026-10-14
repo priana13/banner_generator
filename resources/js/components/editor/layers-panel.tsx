@@ -3,17 +3,21 @@ import {
     Eye,
     EyeOff,
     Image as ImageIcon,
+    LoaderCircle,
     Lock,
     LockOpen,
+    Plus,
     RectangleHorizontal,
     Sparkle,
     Square,
     Trash2,
     Type,
     Upload,
+    X,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { errorMessage } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import {
     createCircle,
     createImage,
@@ -22,10 +26,20 @@ import {
     createText,
 } from '@/lib/editor-elements';
 import { useEditorStore } from '@/lib/editor-store';
-import { uploadImage } from '@/lib/image-processing';
+import {
+    prepareImage,
+    rasterizeSvg,
+    uploadImage,
+} from '@/lib/image-processing';
 import { ORNAMENTS, ornamentUrl } from '@/lib/ornaments';
 import { cn } from '@/lib/utils';
-import type { DesignElement } from '@/types';
+import {
+    destroy as destroyOrnament,
+    index as listOrnaments,
+    store as storeOrnament,
+} from '@/routes/api/ornaments';
+import { use as ornamentUseRoute } from '@/routes/api/projects/ornaments';
+import type { DesignElement, EditorAsset, UserOrnament } from '@/types';
 
 const TYPE_ICONS = {
     text: Type,
@@ -38,6 +52,201 @@ const TYPE_ICONS = {
 
 const toolClass =
     'flex cursor-pointer flex-col items-center gap-1 rounded-xl border border-slate-200 p-3 text-xs hover:bg-slate-50';
+
+/**
+ * Built-in ornaments (recolorable vectors) and the user's own library of
+ * uploaded ornament images.
+ */
+function OrnamentPicker({ projectId }: { projectId: number }) {
+    const addElement = useEditorStore((state) => state.addElement);
+    const [library, setLibrary] = useState<UserOrnament[]>([]);
+    const [uploading, setUploading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        api<{ data: UserOrnament[] }>(listOrnaments())
+            .then(({ data }) => {
+                if (!cancelled) {
+                    setLibrary(data);
+                }
+            })
+            .catch(() => {
+                // The built-in ornaments still work without the library.
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const state = () => useEditorStore.getState();
+
+    const upload = async (file: File): Promise<void> => {
+        setUploading(true);
+
+        try {
+            const isSvg =
+                file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+            const form = new FormData();
+
+            form.append(
+                'file',
+                await prepareImage(isSvg ? await rasterizeSvg(file) : file),
+                file.name.replace(/\.svg$/i, '.png'),
+            );
+
+            const ornament = await api<UserOrnament>(storeOrnament(), form);
+
+            setLibrary((current) => [ornament, ...current]);
+        } catch (error) {
+            toast.error(errorMessage(error));
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const place = async (ornament: UserOrnament): Promise<void> => {
+        try {
+            const asset = await api<EditorAsset>(
+                ornamentUseRoute({
+                    project: projectId,
+                    ornament: ornament.id,
+                }),
+            );
+
+            state().addAsset(asset);
+            addElement({
+                ...createImage(state().document.canvas, asset),
+                name: `Ornamen: ${ornament.name}`,
+            });
+        } catch (error) {
+            toast.error(errorMessage(error));
+        }
+    };
+
+    const remove = async (ornament: UserOrnament): Promise<void> => {
+        if (
+            !window.confirm(
+                `Hapus "${ornament.name}" dari pustaka? Desain yang sudah memakainya tidak berubah.`,
+            )
+        ) {
+            return;
+        }
+
+        try {
+            await api(destroyOrnament(ornament.id));
+            setLibrary((current) =>
+                current.filter((item) => item.id !== ornament.id),
+            );
+        } catch (error) {
+            toast.error(errorMessage(error));
+        }
+    };
+
+    const tileClass =
+        'grid aspect-square place-items-center rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50';
+
+    return (
+        <>
+            <div className="mt-4 text-xs font-semibold text-slate-600">
+                Ornamen
+            </div>
+            <div className="mt-2 grid grid-cols-5 gap-1.5">
+                {Object.entries(ORNAMENTS).map(([id, ornament]) => (
+                    <button
+                        key={id}
+                        type="button"
+                        title={ornament.label}
+                        aria-label={`Tambah ornamen ${ornament.label}`}
+                        onClick={() =>
+                            addElement(
+                                createOrnament(
+                                    state().document.canvas,
+                                    id,
+                                    state().accent,
+                                ),
+                            )
+                        }
+                        className={tileClass}
+                    >
+                        <img
+                            src={ornamentUrl(id, '#16a34a')}
+                            alt=""
+                            className="max-h-full max-w-full"
+                        />
+                    </button>
+                ))}
+            </div>
+
+            <div className="mt-4 text-xs font-semibold text-slate-600">
+                Ornamen saya
+            </div>
+            <div className="mt-2 grid grid-cols-5 gap-1.5">
+                <label
+                    title="Upload ornamen"
+                    className={cn(
+                        tileClass,
+                        'cursor-pointer border-dashed border-slate-300 text-slate-500',
+                    )}
+                >
+                    {uploading ? (
+                        <LoaderCircle className="size-4 animate-spin" />
+                    ) : (
+                        <Plus className="size-4" />
+                    )}
+                    <span className="sr-only">Upload ornamen</span>
+                    <input
+                        type="file"
+                        accept="image/png,image/webp,image/svg+xml,image/jpeg,.svg"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(event) => {
+                            const file = event.target.files?.[0];
+
+                            event.target.value = '';
+
+                            if (file) {
+                                void upload(file);
+                            }
+                        }}
+                    />
+                </label>
+                {library.map((ornament) => (
+                    <div key={ornament.id} className="group relative">
+                        <button
+                            type="button"
+                            title={ornament.name}
+                            aria-label={`Tambah ornamen ${ornament.name}`}
+                            onClick={() => void place(ornament)}
+                            className={cn(tileClass, 'editor-checker w-full')}
+                        >
+                            <img
+                                src={ornament.url}
+                                alt=""
+                                className="max-h-full max-w-full object-contain"
+                            />
+                        </button>
+                        <button
+                            type="button"
+                            title="Hapus dari pustaka"
+                            aria-label={`Hapus ornamen ${ornament.name}`}
+                            onClick={() => void remove(ornament)}
+                            className="absolute -top-1 -right-1 hidden rounded-full border border-slate-200 bg-white p-0.5 text-slate-500 group-focus-within:block group-hover:block hover:text-red-500"
+                        >
+                            <X className="size-3" />
+                        </button>
+                    </div>
+                ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+                Format: PNG atau WebP berlatar transparan (disarankan), atau SVG
+                (otomatis diubah ke PNG). JPG bisa, tetapi tidak transparan.
+                Gambar di atas 1600 px diperkecil otomatis.
+            </p>
+        </>
+    );
+}
 
 export function ElementsPanel({ projectId }: { projectId: number }) {
     const addElement = useEditorStore((state) => state.addElement);
@@ -122,35 +331,7 @@ export function ElementsPanel({ projectId }: { projectId: number }) {
                     />
                 </label>
             </div>
-            <div className="mt-3 text-xs font-semibold text-slate-600">
-                Ornamen
-            </div>
-            <div className="mt-2 grid grid-cols-4 gap-2">
-                {Object.entries(ORNAMENTS).map(([id, ornament]) => (
-                    <button
-                        key={id}
-                        type="button"
-                        title={ornament.label}
-                        aria-label={`Tambah ornamen ${ornament.label}`}
-                        onClick={() =>
-                            addElement(
-                                createOrnament(
-                                    state().document.canvas,
-                                    id,
-                                    state().accent,
-                                ),
-                            )
-                        }
-                        className="grid aspect-square place-items-center rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50"
-                    >
-                        <img
-                            src={ornamentUrl(id, '#16a34a')}
-                            alt=""
-                            className="max-h-full max-w-full"
-                        />
-                    </button>
-                ))}
-            </div>
+            <OrnamentPicker projectId={projectId} />
         </div>
     );
 }

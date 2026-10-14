@@ -10,6 +10,7 @@ Sudah dibuat (versi pertama):
 - **Judul multi-warna, subjudul, ketebalan font** (Regular/SemiBold/Bold/ExtraBold). Skema tetap `schemaVersion: 1` karena perubahannya hanya menambah properti opsional.
 - **Template "cutout"** di `BannerComposer::composeCutout()`, dipilih lewat "Gaya desain" di form.
 - **Ornamen** bawaan: garis lengkung, daun, dedaunan, pendar (`resources/js/lib/ornaments.ts`).
+- **Pustaka ornamen**: 19 ornamen bawaan (bisa diwarnai) dan pustaka ornamen pribadi per pengguna (unggah PNG/WebP transparan; SVG diubah ke PNG di browser, server tetap menolak SVG).
 - **Prompt tersimpan** per pengguna, serta export/import prompt sebagai berkas.
 
 Belum dibuat / masih perlu dikerjakan:

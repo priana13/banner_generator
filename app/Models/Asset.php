@@ -36,6 +36,9 @@ class Asset extends Model
 
     public const KIND_GENERATED = 'generated';
 
+    /** A copy of an ornament from the user's library. */
+    public const KIND_ORNAMENT = 'ornament';
+
     /**
      * @return BelongsTo<Project, $this>
      */

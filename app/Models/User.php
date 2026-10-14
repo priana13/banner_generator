@@ -40,6 +40,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<Ornament, $this>
+     */
+    public function ornaments(): HasMany
+    {
+        return $this->hasMany(Ornament::class);
+    }
+
+    /**
      * @return HasMany<PromptPreset, $this>
      */
     public function promptPresets(): HasMany
