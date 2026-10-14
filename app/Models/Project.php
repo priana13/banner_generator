@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property int|null $category_id
  * @property string $title
  * @property ProjectStatus $status
  * @property int $canvas_width
@@ -26,7 +27,7 @@ use Illuminate\Support\Carbon;
  * @property-read DesignRevision|null $currentRevision
  * @property-read Collection<int, Asset> $assets
  */
-#[Fillable(['title', 'status', 'canvas_width', 'canvas_height', 'current_revision_id'])]
+#[Fillable(['category_id', 'title', 'status', 'canvas_width', 'canvas_height', 'current_revision_id'])]
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
@@ -79,6 +80,12 @@ class Project extends Model
         return $this->hasMany(GenerationJob::class);
     }
 
+    /** @return BelongsTo<ProjectCategory, $this> */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProjectCategory::class, 'category_id');
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -87,6 +94,7 @@ class Project extends Model
     protected function casts(): array
     {
         return [
+            'category_id' => 'integer',
             'status' => ProjectStatus::class,
             'canvas_width' => 'integer',
             'canvas_height' => 'integer',

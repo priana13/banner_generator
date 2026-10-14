@@ -1,10 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ImageOff, Plus, Trash2 } from 'lucide-react';
+import { Folder, ImageOff, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { toast } from 'sonner';
 import { DocumentPreview } from '@/components/document-preview';
 import InputError from '@/components/input-error';
+import ProjectCategoryManager from '@/components/project-category-manager';
+import ProjectCategorySelect from '@/components/project-category-select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,9 +24,14 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { CANVAS_PRESETS } from '@/lib/editor-elements';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
-import { destroy, store } from '@/routes/api/projects';
+import { destroy, store, update } from '@/routes/api/projects';
 import { show } from '@/routes/projects';
-import type { EditorPayload, ProjectStatus, ProjectSummary } from '@/types';
+import type {
+    EditorPayload,
+    ProjectCategory,
+    ProjectStatus,
+    ProjectSummary,
+} from '@/types';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
     draft: 'Draf',
@@ -33,7 +40,16 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
     failed: 'Generate gagal',
 };
 
-function NewProjectDialog() {
+function NewProjectDialog({
+    categories,
+    selected,
+}: {
+    categories: ProjectCategory[];
+    selected: string;
+}) {
+    const [categoryId, setCategoryId] = useState<number | null>(
+        /^\d+$/.test(selected) ? Number(selected) : null,
+    );
     const [open, setOpen] = useState(false);
     const [title, setTitle] = useState('');
     const [width, setWidth] = useState<number>(CANVAS_PRESETS[0].width);
@@ -49,6 +65,7 @@ function NewProjectDialog() {
         try {
             const created = await api<EditorPayload>(store(), {
                 title: title.trim() || 'Banner tanpa judul',
+                category_id: categoryId,
                 canvas_width: width,
                 canvas_height: height,
             });
@@ -99,6 +116,25 @@ function NewProjectDialog() {
                                 }
                             />
                             <InputError message={errors.title?.[0]} />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="new-project-category">
+                                Kategori
+                            </Label>
+                            <ProjectCategorySelect
+                                id="new-project-category"
+                                categories={categories}
+                                value={categoryId}
+                                onChange={setCategoryId}
+                            />
+                            <InputError message={errors.category_id?.[0]} />
+                            {categories.length === 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    Tambahkan kategori melalui “Kelola kategori”
+                                    di dashboard.
+                                </p>
+                            )}
                         </div>
 
                         <div className="grid gap-2">
@@ -186,7 +222,27 @@ function NewProjectDialog() {
     );
 }
 
-function ProjectCard({ project }: { project: ProjectSummary }) {
+function ProjectCard({
+    project,
+    categories,
+}: {
+    project: ProjectSummary;
+    categories: ProjectCategory[];
+}) {
+    const [savingCategory, setSavingCategory] = useState(false);
+    const changeCategory = async (categoryId: number | null) => {
+        setSavingCategory(true);
+        try {
+            await api(update(project.id), { category_id: categoryId });
+            router.reload({
+                only: ['projects', 'categories', 'projectCounts'],
+                onFinish: () => setSavingCategory(false),
+            });
+        } catch (error) {
+            toast.error(errorMessage(error));
+            setSavingCategory(false);
+        }
+    };
     const remove = async (): Promise<void> => {
         if (!window.confirm(`Hapus proyek "${project.title}"?`)) {
             return;
@@ -194,7 +250,9 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
 
         try {
             await api(destroy(project.id));
-            router.reload({ only: ['projects'] });
+            router.reload({
+                only: ['projects', 'categories', 'projectCounts'],
+            });
         } catch (error) {
             toast.error(errorMessage(error));
         }
@@ -246,6 +304,25 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
                     </Badge>
                 </div>
             </Link>
+            <div className="flex items-center gap-2 border-t px-3 py-2">
+                <Folder
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                />
+                <label
+                    htmlFor={`project-category-${project.id}`}
+                    className="sr-only"
+                >
+                    Kategori {project.title}
+                </label>
+                <ProjectCategorySelect
+                    id={`project-category-${project.id}`}
+                    categories={categories}
+                    value={project.category_id}
+                    onChange={(value) => void changeCategory(value)}
+                    disabled={savingCategory}
+                />
+            </div>
             <Button
                 variant="secondary"
                 size="icon"
@@ -261,14 +338,33 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
 
 export default function Dashboard({
     projects,
+    categories,
+    categoryFilter,
+    projectCounts,
 }: {
     projects: ProjectSummary[];
+    categories: ProjectCategory[];
+    categoryFilter: string;
+    projectCounts: { all: number; uncategorized: number };
 }) {
+    const filters = [
+        { value: '', name: 'Semua', count: projectCounts.all },
+        {
+            value: 'uncategorized',
+            name: 'Tanpa kategori',
+            count: projectCounts.uncategorized,
+        },
+        ...categories.map((category) => ({
+            value: String(category.id),
+            name: category.name,
+            count: category.projects_count ?? 0,
+        })),
+    ];
     return (
         <>
             <Head title="Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-lg font-semibold">Proyek banner</h1>
                         <p className="text-sm text-muted-foreground">
@@ -276,23 +372,79 @@ export default function Dashboard({
                             editor.
                         </p>
                     </div>
-                    <NewProjectDialog />
+                    <div className="flex flex-wrap gap-2">
+                        <ProjectCategoryManager
+                            categories={categories}
+                            selected={categoryFilter}
+                        />
+                        <NewProjectDialog
+                            key={categoryFilter}
+                            categories={categories}
+                            selected={categoryFilter}
+                        />
+                    </div>
                 </div>
+
+                <nav
+                    aria-label="Filter kategori proyek"
+                    className="flex flex-wrap gap-2"
+                >
+                    {filters.map((filter) => (
+                        <Link
+                            key={filter.value}
+                            href={dashboard({
+                                query: filter.value
+                                    ? { category: filter.value }
+                                    : {},
+                            })}
+                            preserveScroll
+                            preserveState
+                            aria-current={
+                                categoryFilter === filter.value
+                                    ? 'page'
+                                    : undefined
+                            }
+                            className={cn(
+                                'inline-flex max-w-full items-center gap-2 rounded-full border px-4 py-2 text-sm transition',
+                                categoryFilter === filter.value
+                                    ? 'border-orange-400 bg-orange-500/10 font-semibold text-orange-700 dark:text-orange-300'
+                                    : 'text-muted-foreground hover:bg-accent',
+                            )}
+                        >
+                            <span className="truncate">{filter.name}</span>
+                            <span className="rounded-full bg-background px-1.5 text-xs tabular-nums">
+                                {filter.count}
+                            </span>
+                        </Link>
+                    ))}
+                </nav>
+                <p className="text-xs text-muted-foreground">
+                    {projects.length} proyek ditampilkan
+                </p>
 
                 {projects.length === 0 ? (
                     <div className="grid flex-1 place-items-center rounded-xl border border-dashed border-sidebar-border/70 p-10 text-center dark:border-sidebar-border">
                         <div>
-                            <p className="font-medium">Belum ada proyek</p>
+                            <p className="font-medium">
+                                {categoryFilter
+                                    ? 'Belum ada proyek di kategori ini'
+                                    : 'Belum ada proyek'}
+                            </p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Klik “Banner baru” untuk membuat banner pertama
-                                Anda.
+                                {categoryFilter
+                                    ? 'Pilih kategori lain atau buat banner baru di kategori ini.'
+                                    : 'Klik “Banner baru” untuk membuat banner pertama Anda.'}
                             </p>
                         </div>
                     </div>
                 ) : (
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {projects.map((project) => (
-                            <ProjectCard key={project.id} project={project} />
+                            <ProjectCard
+                                key={project.id}
+                                project={project}
+                                categories={categories}
+                            />
                         ))}
                     </div>
                 )}

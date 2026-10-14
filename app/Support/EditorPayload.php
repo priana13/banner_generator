@@ -23,6 +23,7 @@ final class EditorPayload
             'project' => [
                 'id' => $project->id,
                 'title' => $project->title,
+                'category_id' => $project->category_id,
                 'status' => $project->status->value,
             ],
             'document' => $revision->document_json

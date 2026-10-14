@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AssetController as ApiAssetController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\GenerationController;
 use App\Http\Controllers\Api\OrnamentController;
+use App\Http\Controllers\Api\ProjectCategoryController;
 use App\Http\Controllers\Api\ProjectController as ApiProjectController;
 use App\Http\Controllers\Api\PromptPresetController;
 use App\Http\Controllers\AssetController;
@@ -20,6 +21,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // JSON endpoints used by the editor. They share the session guard and
     // CSRF protection of the web group; no API key ever reaches the browser.
     Route::prefix('api')->name('api.')->middleware('throttle:240,1')->group(function () {
+        Route::post('project-categories', [ProjectCategoryController::class, 'store'])->name('project-categories.store');
+        Route::patch('project-categories/{category}', [ProjectCategoryController::class, 'update'])->name('project-categories.update');
+        Route::delete('project-categories/{category}', [ProjectCategoryController::class, 'destroy'])->name('project-categories.destroy');
+
         Route::post('projects', [ApiProjectController::class, 'store'])->name('projects.store');
         Route::get('projects/{project}', [ApiProjectController::class, 'show'])->name('projects.show');
         Route::patch('projects/{project}', [ApiProjectController::class, 'update'])->name('projects.update');

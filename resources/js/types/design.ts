@@ -138,7 +138,12 @@ export type GenerationJob = {
 export type ProjectStatus = 'draft' | 'generating' | 'ready' | 'failed';
 
 export type EditorPayload = {
-    project: { id: number; title: string; status: ProjectStatus };
+    project: {
+        id: number;
+        title: string;
+        status: ProjectStatus;
+        category_id: number | null;
+    };
     document: DesignDocument;
     version: number;
     assets: EditorAsset[];
@@ -169,7 +174,15 @@ export type PromptPreset = {
     style: BannerStyle | null;
 };
 
+export type ProjectCategory = {
+    id: number;
+    name: string;
+    projects_count?: number;
+};
+
 export type ProjectSummary = {
+    category_id: number | null;
+    category_name: string | null;
     id: number;
     title: string;
     status: ProjectStatus;

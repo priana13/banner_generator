@@ -55,6 +55,12 @@ class User extends Authenticatable
         return $this->hasMany(PromptPreset::class);
     }
 
+    /** @return HasMany<ProjectCategory, $this> */
+    public function projectCategories(): HasMany
+    {
+        return $this->hasMany(ProjectCategory::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

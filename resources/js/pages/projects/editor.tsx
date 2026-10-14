@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { CanvasStage } from '@/components/editor/canvas-stage';
 import { GeneratorPanel } from '@/components/editor/generator-panel';
 import { ElementsPanel, LayersPanel } from '@/components/editor/layers-panel';
+import ProjectCategorySelect from '@/components/project-category-select';
 import { PropertiesPanel } from '@/components/editor/properties-panel';
 import {
     DropdownMenu,
@@ -32,9 +33,13 @@ import type { SaveStatus } from '@/lib/editor-store';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { update as updateProject } from '@/routes/api/projects';
-import type { EditorPayload } from '@/types';
+import type { EditorPayload, ProjectCategory } from '@/types';
 
-type Props = EditorPayload & { fonts: string[]; maxPromptLength: number };
+type Props = EditorPayload & {
+    fonts: string[];
+    maxPromptLength: number;
+    categories: ProjectCategory[];
+};
 
 const SAVE_LABELS: Record<SaveStatus, string> = {
     saved: 'Semua perubahan tersimpan',
@@ -70,11 +75,14 @@ export default function Editor({
     brief,
     fonts,
     maxPromptLength,
+    categories,
 }: Props) {
     const stageRef = useRef<Konva.Stage>(null);
     const workAreaRef = useRef<HTMLDivElement>(null);
     const [title, setTitle] = useState(project.title);
     const [savedTitle, setSavedTitle] = useState(project.title);
+    const [categoryId, setCategoryId] = useState(project.category_id);
+    const [savingCategory, setSavingCategory] = useState(false);
     const [exporting, setExporting] = useState(false);
 
     const loaded = useEditorStore((state) => state.projectId === project.id);
@@ -182,6 +190,19 @@ export default function Editor({
         }
     };
 
+    const changeCategory = async (next: number | null): Promise<void> => {
+        setSavingCategory(true);
+        try {
+            await api(updateProject(project.id), { category_id: next });
+            setCategoryId(next);
+            toast.success('Kategori proyek disimpan.');
+        } catch (error) {
+            toast.error(errorMessage(error));
+        } finally {
+            setSavingCategory(false);
+        }
+    };
+
     const runExport = async (format: ExportFormat): Promise<void> => {
         const stage = stageRef.current;
 
@@ -230,19 +251,28 @@ export default function Editor({
                         </div>
                     </Link>
                     <span className="mx-2 hidden h-7 border-l border-slate-200 md:block" />
-                    <input
-                        value={title}
-                        maxLength={120}
-                        aria-label="Nama proyek"
-                        onChange={(event) => setTitle(event.target.value)}
-                        onBlur={() => void renameProject()}
-                        onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                                event.currentTarget.blur();
-                            }
-                        }}
-                        className="hidden w-64 bg-transparent text-sm font-semibold outline-none md:block"
-                    />
+                    <div className="hidden w-64 space-y-1 md:block">
+                        <input
+                            value={title}
+                            maxLength={120}
+                            aria-label="Nama proyek"
+                            onChange={(event) => setTitle(event.target.value)}
+                            onBlur={() => void renameProject()}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                    event.currentTarget.blur();
+                                }
+                            }}
+                            className="w-full bg-transparent text-sm font-semibold outline-none"
+                        />
+                        <ProjectCategorySelect
+                            categories={categories}
+                            value={categoryId}
+                            onChange={(value) => void changeCategory(value)}
+                            disabled={savingCategory}
+                            className="h-7 text-xs"
+                        />
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <span

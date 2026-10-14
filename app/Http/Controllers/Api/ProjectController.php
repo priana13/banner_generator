@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
@@ -58,9 +59,12 @@ class ProjectController extends Controller
     {
         Gate::authorize('update', $project);
 
-        $project->update($request->validate(['title' => ['required', 'string', 'max:120']]));
+        $project->update($request->validate([
+            'title' => ['sometimes', 'required', 'string', 'max:120'],
+            'category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('project_categories', 'id')->where('user_id', $request->user()->id)],
+        ]));
 
-        return response()->json(['title' => $project->title]);
+        return response()->json(['title' => $project->title, 'category_id' => $project->category_id]);
     }
 
     /**
