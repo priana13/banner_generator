@@ -12,12 +12,12 @@ export function useFontsReady(families: string[]): boolean {
         let cancelled = false;
 
         void Promise.allSettled(
-            key
-                .split('|')
-                .flatMap((family) => [
-                    document.fonts.load(`400 16px "${family}"`),
-                    document.fonts.load(`700 16px "${family}"`),
-                ]),
+            key.split('|').flatMap((family) =>
+                // Every weight the editor offers.
+                [400, 600, 700, 800].map((weight) =>
+                    document.fonts.load(`${weight} 16px "${family}"`),
+                ),
+            ),
         ).then(() => {
             if (!cancelled) {
                 setReady(true);

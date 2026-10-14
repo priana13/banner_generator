@@ -82,37 +82,49 @@ class GenerateBannerJob implements ShouldQueue
         $photo = $this->asset($project, $request['photo_asset_id'] ?? null);
         $logo = $this->asset($project, $request['logo_asset_id'] ?? null);
 
-        // With an uploaded photo the AI paints the backdrop; otherwise it
-        // produces the visual itself. Either way it is stored as its own asset.
-        $box = $photo === null
-            ? $composer->visualBox($brief->width, $brief->height, $spec['layout'])
-            : ['width' => $brief->width, 'height' => $brief->height];
-        $purpose = $photo === null ? ImageRequest::PURPOSE_VISUAL : ImageRequest::PURPOSE_BACKGROUND;
+        $style = $request['style'] ?? ($photo === null ? BannerComposer::STYLE_PANEL : BannerComposer::STYLE_CUTOUT);
+        $generated = null;
+        $image = null;
 
-        $image = $images->generate(new ImageRequest(
-            $spec['imagePrompt'], $box['width'], $box['height'], $brief->accentColor, $purpose,
-        ));
+        if ($style === BannerComposer::STYLE_CUTOUT) {
+            // A clean, light design built from the uploaded photo and
+            // built-in ornaments: no image model is involved.
+            $document = $composer->composeCutout($spec, $brief, $photo, $logo);
+        } else {
+            // With an uploaded photo the AI paints the backdrop; otherwise it
+            // produces the visual itself. Either way it is stored as its own asset.
+            $box = $photo === null
+                ? $composer->visualBox($brief->width, $brief->height, $spec['layout'])
+                : ['width' => $brief->width, 'height' => $brief->height];
+            $purpose = $photo === null ? ImageRequest::PURPOSE_VISUAL : ImageRequest::PURPOSE_BACKGROUND;
 
-        $generated = $assets->store($project, $image->binary, Asset::KIND_GENERATED, [
-            'provider' => $images->name(),
-            'model' => $images->model(),
-            'purpose' => $purpose,
-            'generation_job_id' => $job->id,
-        ]);
+            $image = $images->generate(new ImageRequest(
+                $spec['imagePrompt'], $box['width'], $box['height'], $brief->accentColor, $purpose,
+            ));
 
-        $document = $composer->compose(
-            $spec,
-            $brief,
-            visual: $photo === null ? $generated : null,
-            background: $photo === null ? null : $generated,
-            photo: $photo,
-            logo: $logo,
-        );
+            $generated = $assets->store($project, $image->binary, Asset::KIND_GENERATED, [
+                'provider' => $images->name(),
+                'model' => $images->model(),
+                'purpose' => $purpose,
+                'generation_job_id' => $job->id,
+            ]);
+
+            $document = $composer->compose(
+                $spec,
+                $brief,
+                visual: $photo === null ? $generated : null,
+                background: $photo === null ? null : $generated,
+                photo: $photo,
+                logo: $logo,
+            );
+        }
 
         // The user may have cancelled while the providers were working: the
         // current design must then stay exactly as it is.
         if ($job->refresh()->status !== GenerationStatus::Running) {
-            $assets->delete($generated);
+            if ($generated !== null) {
+                $assets->delete($generated);
+            }
 
             return;
         }
@@ -124,8 +136,8 @@ class GenerateBannerJob implements ShouldQueue
 
             $job->update([
                 'status' => GenerationStatus::Succeeded,
-                'result_json' => ['spec' => $spec, 'asset_id' => $generated->id, 'version' => $revision->version],
-                'cost_estimate' => $layout->cost + $image->cost,
+                'result_json' => ['spec' => $spec, 'asset_id' => $generated?->id, 'version' => $revision->version],
+                'cost_estimate' => $layout->cost + ($image->cost ?? 0.0),
                 'finished_at' => now(),
             ]);
         });

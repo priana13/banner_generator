@@ -34,7 +34,7 @@ import { dashboard } from '@/routes';
 import { update as updateProject } from '@/routes/api/projects';
 import type { EditorPayload } from '@/types';
 
-type Props = EditorPayload & { fonts: string[] };
+type Props = EditorPayload & { fonts: string[]; maxPromptLength: number };
 
 const SAVE_LABELS: Record<SaveStatus, string> = {
     saved: 'Semua perubahan tersimpan',
@@ -67,7 +67,9 @@ export default function Editor({
     version,
     assets,
     job,
+    brief,
     fonts,
+    maxPromptLength,
 }: Props) {
     const stageRef = useRef<Konva.Stage>(null);
     const workAreaRef = useRef<HTMLDivElement>(null);
@@ -93,6 +95,11 @@ export default function Editor({
         useEditorStore
             .getState()
             .load(project.id, initialDocument, assets, version);
+
+        if (brief?.primary_color) {
+            useEditorStore.getState().setAccent(brief.primary_color);
+        }
+
         // The server props are only the starting point; afterwards the
         // store owns the document.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -304,6 +311,8 @@ export default function Editor({
                     <GeneratorPanel
                         projectId={project.id}
                         generation={generation}
+                        brief={brief}
+                        maxPromptLength={maxPromptLength}
                     />
                     <ElementsPanel projectId={project.id} />
                     <LayersPanel />
@@ -418,7 +427,7 @@ export default function Editor({
                 </main>
 
                 <aside className="hidden w-[275px] shrink-0 [scrollbar-width:thin] overflow-y-auto border-l border-slate-200 bg-white lg:block">
-                    <PropertiesPanel fonts={fonts} />
+                    <PropertiesPanel fonts={fonts} projectId={project.id} />
                 </aside>
             </div>
         </div>

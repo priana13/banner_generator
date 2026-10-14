@@ -30,6 +30,12 @@ final class EditorPayload
             'version' => $revision->version ?? 0,
             'assets' => $project->assets()->get()->map(fn (Asset $asset) => $asset->toEditorArray())->all(),
             'job' => $job?->toStatusArray(),
+            // The last brief, so the prompt survives a reload.
+            'brief' => $job === null ? null : [
+                'prompt' => (string) ($job->request_json['prompt'] ?? ''),
+                'primary_color' => $job->request_json['primary_color'] ?? null,
+                'style' => $job->request_json['style'] ?? null,
+            ],
         ];
     }
 }

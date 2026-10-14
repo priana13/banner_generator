@@ -15,7 +15,15 @@ import { useFontsReady } from '@/hooks/use-fonts-ready';
 import { useImage } from '@/hooks/use-image';
 import { LINE_HEIGHT } from '@/lib/editor-elements';
 import { useEditorStore } from '@/lib/editor-store';
-import type { DesignElement, ElementPatch, ImageElement } from '@/types';
+import { ornamentUrl } from '@/lib/ornaments';
+import { layoutSpans } from '@/lib/text-layout';
+import type {
+    DesignElement,
+    ElementPatch,
+    ImageElement,
+    OrnamentElement,
+    TextElement,
+} from '@/types';
 
 const MIN_SIZE = 5;
 const SIDE_ANCHORS = ['middle-left', 'middle-right'];
@@ -54,6 +62,56 @@ function ImageNode({
             width={element.width}
             height={element.height}
         />
+    );
+}
+
+function OrnamentNode({
+    element,
+    common,
+}: {
+    element: OrnamentElement;
+    common: Konva.NodeConfig;
+}) {
+    const image = useImage(ornamentUrl(element.ornamentId, element.fill));
+
+    return image ? (
+        <KonvaImage
+            {...common}
+            image={image}
+            width={element.width}
+            height={element.height}
+        />
+    ) : null;
+}
+
+/** Text whose fragments have different colors: one run per word. */
+function SpansNode({
+    element,
+    common,
+}: {
+    element: TextElement;
+    common: Konva.NodeConfig;
+}) {
+    const { runs, height } = layoutSpans(element);
+
+    return (
+        <Group {...common}>
+            {/* Gives the group a solid area to click and drag. */}
+            <Rect width={element.width} height={height} fill="rgba(0,0,0,0)" />
+            {runs.map((run, index) => (
+                <Text
+                    key={index}
+                    x={run.x}
+                    y={run.y}
+                    text={run.text}
+                    fill={run.fill}
+                    fontFamily={element.fontFamily}
+                    fontSize={element.fontSize}
+                    fontStyle={element.fontStyle}
+                    listening={false}
+                />
+            ))}
+        </Group>
     );
 }
 
@@ -114,7 +172,13 @@ function ElementNode({ element }: { element: DesignElement }) {
     };
 
     switch (element.type) {
+        case 'ornament':
+            return <OrnamentNode element={element} common={common} />;
         case 'text':
+            if (element.spans?.length) {
+                return <SpansNode element={element} common={common} />;
+            }
+
             return (
                 <Text
                     {...common}

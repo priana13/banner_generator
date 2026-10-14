@@ -1,13 +1,34 @@
-import { ImagePlus, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
-import { useState } from 'react';
+import {
+    BookmarkPlus,
+    Download,
+    ImagePlus,
+    LoaderCircle,
+    RotateCcw,
+    Sparkles,
+    Trash2,
+    Upload,
+    X,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { GenerationBrief } from '@/hooks/use-generation';
 import { api, errorMessage } from '@/lib/api';
+import { removeBackground } from '@/lib/background-removal';
 import { ACCENT_COLORS, CANVAS_PRESETS } from '@/lib/editor-elements';
 import { useEditorStore } from '@/lib/editor-store';
+import { uploadImage } from '@/lib/image-processing';
 import { cn } from '@/lib/utils';
-import { store as uploadAsset } from '@/routes/api/projects/assets';
-import type { EditorAsset } from '@/types';
+import {
+    destroy as destroyPreset,
+    index as listPresets,
+    store as storePreset,
+} from '@/routes/api/prompt-presets';
+import type {
+    BannerStyle,
+    EditorAsset,
+    EditorPayload,
+    PromptPreset,
+} from '@/types';
 
 type Generation = {
     busy: boolean;
@@ -19,40 +40,69 @@ type Generation = {
     cancel: () => Promise<void>;
 };
 
+const STYLES: { value: BannerStyle; label: string }[] = [
+    { value: 'cutout', label: 'Foto cutout — latar terang & ornamen' },
+    { value: 'panel', label: 'Panel warna — dengan gambar AI' },
+];
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+const iconButton =
+    'rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-40';
+
+function isStyle(value: unknown): value is BannerStyle {
+    return value === 'cutout' || value === 'panel';
+}
+
+function download(content: string, filename: string): void {
+    const link = document.createElement('a');
+
+    link.href = URL.createObjectURL(
+        new Blob([content], { type: 'application/json' }),
+    );
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
 function BriefUpload({
     label,
     kind,
     projectId,
     asset,
+    removeBg = false,
     onChange,
 }: {
     label: string;
     kind: 'upload' | 'logo';
     projectId: number;
     asset: EditorAsset | null;
+    /** Cut the subject out of its background before uploading. */
+    removeBg?: boolean;
     onChange: (asset: EditorAsset | null) => void;
 }) {
-    const [uploading, setUploading] = useState(false);
+    const [status, setStatus] = useState<string | null>(null);
 
     const upload = async (file: File): Promise<void> => {
-        const form = new FormData();
-
-        form.append('file', file);
-        form.append('kind', kind);
-        setUploading(true);
-
         try {
-            const uploaded = await api<EditorAsset>(
-                uploadAsset(projectId),
-                form,
-            );
-
-            useEditorStore.getState().addAsset(uploaded);
-            onChange(uploaded);
+            if (removeBg) {
+                setStatus('Menghapus latar…');
+                onChange(
+                    await uploadImage(
+                        projectId,
+                        await removeBackground(file),
+                        'cutout',
+                        file.name.replace(/\.[^.]+$/, '') + '.png',
+                    ),
+                );
+            } else {
+                setStatus('Mengunggah…');
+                onChange(await uploadImage(projectId, file, kind, file.name));
+            }
         } catch (error) {
             toast.error(errorMessage(error));
         } finally {
-            setUploading(false);
+            setStatus(null);
         }
     };
 
@@ -62,7 +112,7 @@ function BriefUpload({
                 <img
                     src={asset.url}
                     alt=""
-                    className="size-8 rounded object-cover"
+                    className="editor-checker size-8 rounded object-contain"
                 />
                 <span className="min-w-0 flex-1 truncate">
                     {asset.name ?? label}
@@ -81,17 +131,17 @@ function BriefUpload({
 
     return (
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 p-2.5 text-xs text-slate-500 hover:bg-slate-50">
-            {uploading ? (
+            {status ? (
                 <LoaderCircle className="size-3.5 animate-spin" />
             ) : (
                 <ImagePlus className="size-3.5" />
             )}
-            {label}
+            {status ?? label}
             <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 className="hidden"
-                disabled={uploading}
+                disabled={status !== null}
                 onChange={(event) => {
                     const file = event.target.files?.[0];
 
@@ -109,22 +159,189 @@ function BriefUpload({
 export function GeneratorPanel({
     projectId,
     generation,
+    brief,
+    maxPromptLength,
 }: {
     projectId: number;
     generation: Generation;
+    brief: EditorPayload['brief'];
+    maxPromptLength: number;
 }) {
     const canvas = useEditorStore((state) => state.document.canvas);
     const accent = useEditorStore((state) => state.accent);
     const setAccent = useEditorStore((state) => state.setAccent);
     const setCanvas = useEditorStore((state) => state.setCanvas);
-    const [prompt, setPrompt] = useState('');
+    const [prompt, setPrompt] = useState(brief?.prompt ?? '');
+    const [style, setStyle] = useState<BannerStyle>(brief?.style ?? 'cutout');
     const [photo, setPhoto] = useState<EditorAsset | null>(null);
     const [logo, setLogo] = useState<EditorAsset | null>(null);
+    const [removeBg, setRemoveBg] = useState(true);
+    const [presets, setPresets] = useState<PromptPreset[]>([]);
+    const [presetId, setPresetId] = useState<number | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        api<{ data: PromptPreset[] }>(listPresets())
+            .then(({ data }) => {
+                if (!cancelled) {
+                    setPresets(data);
+                }
+            })
+            .catch(() => {
+                // Saved prompts are a convenience; the editor works without.
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const size = `${canvas.width}x${canvas.height}`;
     const isPreset = CANVAS_PRESETS.some(
         (preset) => `${preset.width}x${preset.height}` === size,
     );
+    const selectedPreset = presets.find((preset) => preset.id === presetId);
+    const hasPrompt = prompt.trim().length >= 5;
+
+    /** Load a saved or imported brief into the form. */
+    const applyBrief = (values: {
+        prompt: string;
+        primary_color?: unknown;
+        style?: unknown;
+        width?: unknown;
+        height?: unknown;
+    }): void => {
+        setPrompt(values.prompt.slice(0, maxPromptLength));
+
+        if (
+            typeof values.primary_color === 'string' &&
+            HEX.test(values.primary_color)
+        ) {
+            setAccent(values.primary_color);
+        }
+
+        if (isStyle(values.style)) {
+            setStyle(values.style);
+        }
+
+        const width = Number(values.width);
+        const height = Number(values.height);
+
+        if (
+            Number.isInteger(width) &&
+            Number.isInteger(height) &&
+            width >= 50 &&
+            width <= 4096 &&
+            height >= 50 &&
+            height <= 4096 &&
+            (width !== canvas.width || height !== canvas.height)
+        ) {
+            setCanvas({ width, height });
+        }
+    };
+
+    const savePreset = async (): Promise<void> => {
+        const name = window
+            .prompt('Simpan prompt dengan nama:', selectedPreset?.name ?? '')
+            ?.trim();
+
+        if (!name) {
+            return;
+        }
+
+        try {
+            const saved = await api<PromptPreset>(storePreset(), {
+                name,
+                prompt: prompt.trim(),
+                primary_color: accent,
+                style,
+            });
+
+            setPresets((current) =>
+                [...current.filter((item) => item.id !== saved.id), saved].sort(
+                    (a, b) => a.name.localeCompare(b.name),
+                ),
+            );
+            setPresetId(saved.id);
+            toast.success('Prompt disimpan.');
+        } catch (error) {
+            toast.error(errorMessage(error));
+        }
+    };
+
+    const deletePreset = async (): Promise<void> => {
+        if (
+            !selectedPreset ||
+            !window.confirm(`Hapus prompt "${selectedPreset.name}"?`)
+        ) {
+            return;
+        }
+
+        try {
+            await api(destroyPreset(selectedPreset.id));
+            setPresets((current) =>
+                current.filter((item) => item.id !== selectedPreset.id),
+            );
+            setPresetId(null);
+        } catch (error) {
+            toast.error(errorMessage(error));
+        }
+    };
+
+    const exportPrompt = (): void => {
+        const name = selectedPreset?.name ?? 'prompt-banner';
+
+        download(
+            JSON.stringify(
+                {
+                    app: 'bannerai-prompt',
+                    version: 1,
+                    name,
+                    prompt: prompt.trim(),
+                    primary_color: accent,
+                    style,
+                    width: canvas.width,
+                    height: canvas.height,
+                },
+                null,
+                2,
+            ),
+            `${
+                name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '') || 'prompt'
+            }.json`,
+        );
+    };
+
+    const importPrompt = async (file: File): Promise<void> => {
+        const text = await file.text();
+
+        try {
+            const parsed: unknown = JSON.parse(text);
+
+            if (
+                typeof parsed === 'object' &&
+                parsed !== null &&
+                'prompt' in parsed &&
+                typeof parsed.prompt === 'string'
+            ) {
+                applyBrief(parsed as { prompt: string });
+                setPresetId(null);
+                toast.success('Prompt diimpor.');
+
+                return;
+            }
+
+            toast.error('Berkas tidak berisi prompt.');
+        } catch {
+            // Not JSON: treat the file as the prompt text itself.
+            applyBrief({ prompt: text.trim() });
+            setPresetId(null);
+        }
+    };
 
     return (
         <div className="border-b border-slate-200 p-5">
@@ -133,16 +350,126 @@ export function GeneratorPanel({
                 <h2 className="font-bold">AI Banner Generator</h2>
             </div>
             <p className="mb-4 text-xs text-slate-500">
-                Jelaskan banner yang ingin Anda buat.
+                Jelaskan banner yang ingin Anda buat. Teks dan warna yang Anda
+                tulis persis akan dipakai apa adanya.
             </p>
             <textarea
-                rows={5}
+                rows={6}
                 value={prompt}
-                maxLength={1000}
+                maxLength={maxPromptLength}
                 onChange={(event) => setPrompt(event.target.value)}
-                className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
-                placeholder="Contoh: Banner donasi tebar pangan santri, warna oranye, foto santri di sebelah kanan..."
+                className="w-full resize-y rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
+                placeholder={
+                    'Contoh: Banner hero NGO "Sedekah Pangan Santri".\nHeadline: "Sedekah Pangan Santri"\nSubheadline: "Bantu Penuhi Kebutuhan Pangan Para Penghafal Al-Qur\'an"\nTombol CTA: "Sedekah Sekarang"'
+                }
             />
+
+            <div className="mt-2 flex items-center gap-1.5">
+                <select
+                    value={presetId ?? ''}
+                    aria-label="Prompt tersimpan"
+                    onChange={(event) => {
+                        const preset = presets.find(
+                            (item) => item.id === Number(event.target.value),
+                        );
+
+                        setPresetId(preset?.id ?? null);
+
+                        if (preset) {
+                            applyBrief(preset);
+                        }
+                    }}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white p-2 text-xs"
+                >
+                    <option value="">
+                        {presets.length
+                            ? 'Prompt tersimpan…'
+                            : 'Belum ada prompt tersimpan'}
+                    </option>
+                    {presets.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                            {preset.name}
+                        </option>
+                    ))}
+                </select>
+                <button
+                    type="button"
+                    title="Simpan prompt"
+                    aria-label="Simpan prompt"
+                    disabled={!hasPrompt}
+                    onClick={() => void savePreset()}
+                    className={iconButton}
+                >
+                    <BookmarkPlus className="size-3.5" />
+                </button>
+                {selectedPreset && (
+                    <button
+                        type="button"
+                        title="Hapus prompt tersimpan"
+                        aria-label="Hapus prompt tersimpan"
+                        onClick={() => void deletePreset()}
+                        className={iconButton}
+                    >
+                        <Trash2 className="size-3.5" />
+                    </button>
+                )}
+                <button
+                    type="button"
+                    title="Export prompt ke berkas"
+                    aria-label="Export prompt"
+                    disabled={!hasPrompt}
+                    onClick={exportPrompt}
+                    className={iconButton}
+                >
+                    <Download className="size-3.5" />
+                </button>
+                <label
+                    title="Import prompt dari berkas"
+                    className={cn(iconButton, 'cursor-pointer')}
+                >
+                    <Upload className="size-3.5" />
+                    <span className="sr-only">Import prompt</span>
+                    <input
+                        type="file"
+                        accept=".json,.txt,.md,application/json,text/plain"
+                        className="hidden"
+                        onChange={(event) => {
+                            const file = event.target.files?.[0];
+
+                            event.target.value = '';
+
+                            if (file) {
+                                void importPrompt(file);
+                            }
+                        }}
+                    />
+                </label>
+            </div>
+
+            <div className="mt-4">
+                <label
+                    htmlFor="banner-style"
+                    className="text-xs font-semibold text-slate-600"
+                >
+                    Gaya desain
+                </label>
+                <select
+                    id="banner-style"
+                    value={style}
+                    onChange={(event) => {
+                        if (isStyle(event.target.value)) {
+                            setStyle(event.target.value);
+                        }
+                    }}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm"
+                >
+                    {STYLES.map((item) => (
+                        <option key={item.value} value={item.value}>
+                            {item.label}
+                        </option>
+                    ))}
+                </select>
+            </div>
 
             <div className="mt-4">
                 <label
@@ -219,6 +546,7 @@ export function GeneratorPanel({
                         kind="upload"
                         projectId={projectId}
                         asset={photo}
+                        removeBg={removeBg}
                         onChange={setPhoto}
                     />
                     <BriefUpload
@@ -229,16 +557,29 @@ export function GeneratorPanel({
                         onChange={setLogo}
                     />
                 </div>
+                <label className="mt-2 flex items-start gap-2 text-xs text-slate-500">
+                    <input
+                        type="checkbox"
+                        checked={removeBg}
+                        onChange={(event) => setRemoveBg(event.target.checked)}
+                        className="mt-0.5 accent-orange-500"
+                    />
+                    <span>
+                        Hapus latar foto otomatis (diproses di browser, foto
+                        tidak dikirim ke pihak ketiga)
+                    </span>
+                </label>
             </div>
 
             <button
                 type="button"
-                disabled={generation.busy || prompt.trim().length < 5}
+                disabled={generation.busy || !hasPrompt}
                 onClick={() =>
                     void generation.start({
                         prompt: prompt.trim(),
                         photoAssetId: photo?.id ?? null,
                         logoAssetId: logo?.id ?? null,
+                        style,
                     })
                 }
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 py-3 font-bold text-white shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"

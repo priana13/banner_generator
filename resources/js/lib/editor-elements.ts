@@ -1,14 +1,17 @@
+import { ORNAMENTS } from '@/lib/ornaments';
 import type {
     CircleElement,
     DesignCanvas,
     EditorAsset,
     ImageElement,
+    OrnamentElement,
     RectElement,
     TextElement,
 } from '@/types';
 
 export const CANVAS_PRESETS = [
     { label: 'Website Hero', width: 1200, height: 400 },
+    { label: 'NGO Hero', width: 2048, height: 640 },
     { label: 'Wide Hero', width: 1920, height: 600 },
     { label: 'Square', width: 1080, height: 1080 },
     { label: 'Portrait', width: 1080, height: 1350 },
@@ -94,6 +97,29 @@ export function createCircle(
         width: size,
         height: size,
         fill,
+    };
+}
+
+export function createOrnament(
+    canvas: DesignCanvas,
+    ornamentId: string,
+    fill: string,
+): OrnamentElement {
+    const ornament = ORNAMENTS[ornamentId];
+    const width = Math.round(canvas.width * 0.2);
+    const height = Math.round((width * ornament.height) / ornament.width);
+
+    return {
+        ...base,
+        id: uid(),
+        type: 'ornament',
+        name: ornament.label,
+        ornamentId,
+        fill,
+        x: Math.round((canvas.width - width) / 2),
+        y: Math.round((canvas.height - height) / 2),
+        width,
+        height,
     };
 }
 

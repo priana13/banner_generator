@@ -31,6 +31,9 @@ class Asset extends Model
 
     public const KIND_LOGO = 'logo';
 
+    /** A photo whose background was removed (transparent PNG). */
+    public const KIND_CUTOUT = 'cutout';
+
     public const KIND_GENERATED = 'generated';
 
     /**

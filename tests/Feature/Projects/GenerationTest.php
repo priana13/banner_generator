@@ -91,7 +91,7 @@ test('uploaded photo and logo become separate layers', function () {
     $logo = $upload('logo');
 
     $this->postJson(route('api.projects.generate', $this->project), [
-        ...$this->brief, 'photo_asset_id' => $photo, 'logo_asset_id' => $logo,
+        ...$this->brief, 'photo_asset_id' => $photo, 'logo_asset_id' => $logo, 'style' => 'panel',
     ])->assertAccepted();
 
     $elements = collect($this->project->refresh()->currentRevision->document_json['elements']);
@@ -354,4 +354,114 @@ test('finished jobs cannot be cancelled and other users cannot cancel', function
     $this->actingAs(User::factory()->create())
         ->postJson(route('api.generation-jobs.cancel', $id))
         ->assertForbidden();
+});
+
+test('a detailed brief with a photo produces the cutout style', function () {
+    $photo = $this->postJson(route('api.projects.assets.store', $this->project), [
+        'file' => UploadedFile::fake()->image('santri.png', 900, 1100),
+        'kind' => 'cutout',
+    ])->assertCreated()->json('id');
+
+    $this->postJson(route('api.projects.generate', $this->project), [
+        'prompt' => file_get_contents(base_path('tests/fixtures/sedekah-pangan-prompt.md')),
+        'primary_color' => '#65b32e',
+        'width' => 2048,
+        'height' => 640,
+        'photo_asset_id' => $photo,
+        'style' => 'cutout',
+    ])->assertAccepted()->assertJsonPath('status', 'succeeded');
+
+    $document = $this->project->refresh()->currentRevision->document_json;
+    $elements = collect($document['elements']);
+    $headline = $elements->firstWhere('name', 'Judul utama');
+    $photoLayer = $elements->firstWhere('name', 'Foto');
+    $cta = $elements->firstWhere('name', 'Tombol CTA');
+
+    expect($document['canvas'])->toMatchArray(['width' => 2048, 'height' => 640, 'backgroundColor' => '#ffffff'])
+        ->and($headline['text'])->toBe('Sedekah Pangan Santri')
+        ->and($headline['spans'])->toBe([
+            ['text' => 'Sedekah Pangan', 'fill' => '#65b32e'],
+            ['text' => 'Santri', 'fill' => '#205c32'],
+        ])
+        ->and($headline['fontFamily'])->toBe('Poppins')
+        ->and($headline['fontStyle'])->toBe('800')
+        ->and($elements->firstWhere('name', 'Subjudul')['text'])->toBe("Bantu Penuhi Kebutuhan Pangan Para Penghafal Al-Qur'an")
+        ->and($elements->firstWhere('name', 'Subjudul')['fontStyle'])->toBe('600')
+        ->and($elements->firstWhere('name', 'Deskripsi')['text'])->toStartWith('Salurkan kepedulian')
+        ->and($cta['text'])->toBe('Sedekah Sekarang ››')
+        ->and($cta['cornerRadius'] * 2)->toBeGreaterThanOrEqual($cta['height'] - 1)
+        ->and($elements->where('type', 'ornament')->pluck('ornamentId')->unique()->sort()->values()->all())
+        ->toBe(['foliage', 'glow', 'leaf', 'waves'])
+        // The photo stands on the bottom edge of the right 40% and is the
+        // only raster layer: no AI image is generated for this style.
+        ->and($photoLayer['assetId'])->toBe($photo)
+        ->and($photoLayer['x'])->toBeGreaterThanOrEqual((int) (2048 * 0.6))
+        ->and($photoLayer['y'] + $photoLayer['height'])->toBe(640)
+        ->and($headline['x'] + $headline['width'])->toBeLessThan($photoLayer['x'])
+        ->and($elements->where('type', 'image')->count())->toBe(1)
+        ->and($this->project->assets()->where('kind', 'generated')->count())->toBe(0);
+});
+
+test('cutout copy fits every canvas size', function (int $width, int $height) {
+    $this->postJson(route('api.projects.generate', $this->project), [
+        'prompt' => file_get_contents(base_path('tests/fixtures/sedekah-pangan-prompt.md')),
+        'primary_color' => '#65b32e', 'width' => $width, 'height' => $height, 'style' => 'cutout',
+    ])->assertAccepted()->assertJsonPath('status', 'succeeded');
+
+    // Decorations may bleed off the canvas; the copy may not.
+    $copy = collect($this->project->refresh()->currentRevision->document_json['elements'])
+        ->whereIn('type', ['text', 'button']);
+
+    expect($copy->count())->toBeGreaterThanOrEqual(2);
+
+    foreach ($copy as $element) {
+        expect($element['x'])->toBeGreaterThanOrEqual(0)
+            ->and($element['y'])->toBeGreaterThanOrEqual(0)
+            ->and($element['x'] + $element['width'])->toBeLessThanOrEqual($width)
+            ->and($element['y'] + $element['height'])->toBeLessThanOrEqual($height);
+    }
+})->with([[2048, 640], [1200, 400], [1080, 1080], [1080, 1350], [728, 90]]);
+
+test('the last brief is returned with the project', function () {
+    $this->postJson(route('api.projects.generate', $this->project), [...$this->brief, 'style' => 'panel'])->assertAccepted();
+
+    $this->getJson(route('api.projects.show', $this->project))
+        ->assertJsonPath('brief.prompt', $this->brief['prompt'])
+        ->assertJsonPath('brief.style', 'panel');
+});
+
+test('the llm can return a multi-color headline, subheadline and cta color', function () {
+    config(['banner.layout_provider' => 'openai', 'banner.openai.api_key' => 'sk-test']);
+
+    Http::preventStrayRequests();
+    Http::fake(['*/chat/completions' => Http::response(['choices' => [['message' => ['content' => json_encode([
+        'label' => '', 'headline' => 'Sedekah Pangan Santri',
+        'headlineSegments' => [
+            ['text' => 'Sedekah Pangan', 'color' => '#65B32E'],
+            ['text' => 'Santri', 'color' => 'not-a-color'],
+        ],
+        'subheadline' => 'Bantu Penuhi Kebutuhan Pangan', 'description' => 'Salurkan kepedulian.',
+        'cta' => 'Sedekah Sekarang', 'ctaColor' => '#205C32', 'layout' => 'visual-right',
+        'backgroundColor' => '#000000', 'textColor' => '#111111', 'imagePrompt' => 'x',
+    ])]]]])]);
+
+    $this->postJson(route('api.projects.generate', $this->project), [...$this->brief, 'primary_color' => '#65b32e', 'style' => 'cutout'])
+        ->assertAccepted()
+        ->assertJsonPath('status', 'succeeded');
+
+    $document = $this->project->refresh()->currentRevision->document_json;
+    $elements = collect($document['elements']);
+
+    // An invalid fragment color falls back to a dark shade of the brand
+    // color, and the cutout style always keeps its white canvas.
+    expect($elements->firstWhere('name', 'Judul utama')['spans'])->toBe([
+        ['text' => 'Sedekah Pangan', 'fill' => '#65b32e'],
+        ['text' => 'Santri', 'fill' => '#386219'],
+    ])
+        ->and($elements->firstWhere('name', 'Tombol CTA')['fill'])->toBe('#205c32')
+        ->and($elements->firstWhere('name', 'Subjudul')['text'])->toBe('Bantu Penuhi Kebutuhan Pangan')
+        ->and($elements->firstWhere('name', 'Label'))->toBeNull()
+        ->and($document['canvas']['backgroundColor'])->toBe('#ffffff');
+
+    Http::assertSent(fn ($request) => in_array('headlineSegments', $request['response_format']['json_schema']['schema']['required'], true));
 });

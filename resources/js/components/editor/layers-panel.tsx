@@ -6,23 +6,26 @@ import {
     Lock,
     LockOpen,
     RectangleHorizontal,
+    Sparkle,
     Square,
     Trash2,
     Type,
     Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { api, errorMessage } from '@/lib/api';
+import { errorMessage } from '@/lib/api';
 import {
     createCircle,
     createImage,
+    createOrnament,
     createRect,
     createText,
 } from '@/lib/editor-elements';
 import { useEditorStore } from '@/lib/editor-store';
+import { uploadImage } from '@/lib/image-processing';
+import { ORNAMENTS, ornamentUrl } from '@/lib/ornaments';
 import { cn } from '@/lib/utils';
-import { store as uploadAsset } from '@/routes/api/projects/assets';
-import type { DesignElement, EditorAsset } from '@/types';
+import type { DesignElement } from '@/types';
 
 const TYPE_ICONS = {
     text: Type,
@@ -30,6 +33,7 @@ const TYPE_ICONS = {
     rect: Square,
     circle: Circle,
     image: ImageIcon,
+    ornament: Sparkle,
 } satisfies Record<DesignElement['type'], unknown>;
 
 const toolClass =
@@ -40,16 +44,15 @@ export function ElementsPanel({ projectId }: { projectId: number }) {
 
     const state = () => useEditorStore.getState();
 
-    const uploadImage = async (file: File): Promise<void> => {
-        const form = new FormData();
-
-        form.append('file', file);
-        form.append('kind', 'upload');
-
+    const addImage = async (file: File): Promise<void> => {
         try {
-            const asset = await api<EditorAsset>(uploadAsset(projectId), form);
+            const asset = await uploadImage(
+                projectId,
+                file,
+                'upload',
+                file.name,
+            );
 
-            state().addAsset(asset);
             addElement(createImage(state().document.canvas, asset));
         } catch (error) {
             toast.error(errorMessage(error));
@@ -113,11 +116,40 @@ export function ElementsPanel({ projectId }: { projectId: number }) {
                             event.target.value = '';
 
                             if (file) {
-                                void uploadImage(file);
+                                void addImage(file);
                             }
                         }}
                     />
                 </label>
+            </div>
+            <div className="mt-3 text-xs font-semibold text-slate-600">
+                Ornamen
+            </div>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+                {Object.entries(ORNAMENTS).map(([id, ornament]) => (
+                    <button
+                        key={id}
+                        type="button"
+                        title={ornament.label}
+                        aria-label={`Tambah ornamen ${ornament.label}`}
+                        onClick={() =>
+                            addElement(
+                                createOrnament(
+                                    state().document.canvas,
+                                    id,
+                                    state().accent,
+                                ),
+                            )
+                        }
+                        className="grid aspect-square place-items-center rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50"
+                    >
+                        <img
+                            src={ornamentUrl(id, '#16a34a')}
+                            alt=""
+                            className="max-h-full max-w-full"
+                        />
+                    </button>
+                ))}
             </div>
         </div>
     );

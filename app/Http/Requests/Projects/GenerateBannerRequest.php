@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Projects;
 
 use App\Models\Project;
+use App\Services\Design\BannerComposer;
 use App\Services\Design\Color;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,7 +23,8 @@ class GenerateBannerRequest extends FormRequest
         $asset = Rule::exists('assets', 'id')->where('project_id', $project->id);
 
         return [
-            'prompt' => ['required', 'string', 'min:5', 'max:1000'],
+            'prompt' => ['required', 'string', 'min:5', 'max:'.config()->integer('banner.max_prompt_length')],
+            'style' => ['nullable', 'string', Rule::in(BannerComposer::STYLES)],
             'primary_color' => ['required', 'string', 'regex:'.Color::HEX_PATTERN],
             'width' => ['required', 'integer', "between:{$min},{$max}"],
             'height' => ['required', 'integer', "between:{$min},{$max}"],

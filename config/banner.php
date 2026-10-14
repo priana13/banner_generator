@@ -40,7 +40,13 @@ return [
 
     'daily_generation_quota' => (int) env('BANNER_DAILY_GENERATION_QUOTA', 30),
 
+    // Keep below PHP's upload_max_filesize; the editor downsizes images
+    // in the browser before uploading them.
     'max_upload_kb' => 5120,
+
+    'max_prompt_length' => 6000,
+
+    'max_prompt_presets' => 50,
 
     'max_export_kb' => 20480,
 
@@ -76,5 +82,23 @@ return [
     */
 
     'fonts' => ['Inter', 'Poppins', 'Montserrat', 'Playfair Display'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ornaments
+    |--------------------------------------------------------------------------
+    |
+    | Built-in decorative vectors and their intrinsic [width, height]. The
+    | artwork itself lives in resources/js/lib/ornaments.ts; user-supplied
+    | SVG is never accepted.
+    |
+    */
+
+    'ornaments' => [
+        'waves' => [600, 300],
+        'leaf' => [120, 70],
+        'foliage' => [600, 200],
+        'glow' => [400, 400],
+    ],
 
 ];

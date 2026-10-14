@@ -45,6 +45,7 @@ class ProjectController extends Controller
         return Inertia::render('projects/editor', [
             ...EditorPayload::for($project),
             'fonts' => config()->array('banner.fonts'),
+            'maxPromptLength' => config()->integer('banner.max_prompt_length'),
         ]);
     }
 }

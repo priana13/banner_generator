@@ -13,7 +13,8 @@ use Illuminate\Support\Str;
  * goes on). Positions and sizes are computed by the BannerComposer, so AI
  * output is never trusted for layout.
  *
- * @phpstan-type DesignSpec array{label: string, headline: string, description: string, cta: string, layout: string, imagePrompt: string, backgroundColor: string, textColor: string}
+ * @phpstan-type HeadlineSpan array{text: string, fill: string|null}
+ * @phpstan-type DesignSpec array{label: string, headline: string, headlineSpans: list<HeadlineSpan>, subheadline: string, description: string, cta: string, ctaColor: string|null, layout: string, imagePrompt: string, backgroundColor: string, textColor: string}
  */
 class DesignSpecNormalizer
 {
@@ -31,14 +32,25 @@ class DesignSpecNormalizer
     {
         $clean = [];
 
-        foreach (['label', 'headline', 'description', 'cta', 'imagePrompt'] as $key) {
+        foreach (['label', 'headline', 'subheadline', 'description', 'cta', 'imagePrompt'] as $key) {
             $clean[$key] = is_string($raw[$key] ?? null) ? $this->cleanText($raw[$key]) : null;
+        }
+
+        // Only art direction for the image model: too long is not an error.
+        $clean['imagePrompt'] = $clean['imagePrompt'] === null ? null : Str::limit($clean['imagePrompt'], 590, '');
+
+        // A headline given as colored fragments is the headline.
+        $spans = $this->headlineSpans($raw['headlineSegments'] ?? null);
+
+        if ($spans !== []) {
+            $clean['headline'] = implode(' ', array_column($spans, 'text'));
         }
 
         $validator = Validator::make($clean, [
             'label' => ['nullable', 'string', 'max:48'],
             'headline' => ['required', 'string', 'max:90'],
-            'description' => ['nullable', 'string', 'max:180'],
+            'subheadline' => ['nullable', 'string', 'max:140'],
+            'description' => ['nullable', 'string', 'max:220'],
             'cta' => ['required', 'string', 'max:32'],
             'imagePrompt' => ['nullable', 'string', 'max:600'],
         ]);
@@ -68,13 +80,35 @@ class DesignSpecNormalizer
         return [
             'label' => Str::upper($clean['label'] ?? ''),
             'headline' => (string) $clean['headline'],
+            'headlineSpans' => count($spans) > 1 ? $spans : [],
+            'subheadline' => $clean['subheadline'] ?? '',
             'description' => $clean['description'] ?? '',
             'cta' => (string) $clean['cta'],
+            'ctaColor' => Color::isHex($raw['ctaColor'] ?? null) ? strtolower((string) $raw['ctaColor']) : null,
             'layout' => in_array($layout, self::LAYOUTS, true) ? $layout : self::LAYOUTS[0],
             'imagePrompt' => $clean['imagePrompt'] ?? $brief->prompt,
             'backgroundColor' => $background,
             'textColor' => $text,
         ];
+    }
+
+    /**
+     * @return list<HeadlineSpan>
+     */
+    private function headlineSpans(mixed $segments): array
+    {
+        $spans = [];
+
+        foreach (is_array($segments) ? array_slice($segments, 0, 4) : [] as $segment) {
+            $text = is_array($segment) && is_string($segment['text'] ?? null) ? $this->cleanText($segment['text']) : '';
+
+            if ($text !== '') {
+                $color = $segment['color'] ?? null;
+                $spans[] = ['text' => $text, 'fill' => Color::isHex($color) ? strtolower((string) $color) : null];
+            }
+        }
+
+        return $spans;
     }
 
     private function cleanText(string $value): string

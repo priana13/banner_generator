@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { ornamentUrl } from '@/lib/ornaments';
 import type { DesignDocument, DesignElement, EditorAsset } from '@/types';
 
 function PreviewElement({
@@ -18,11 +19,23 @@ function PreviewElement({
         fontFamily: `"${'fontFamily' in element ? element.fontFamily : 'Inter'}", sans-serif`,
         fontSize: 'fontSize' in element ? element.fontSize : undefined,
         fontWeight:
-            'fontStyle' in element && element.fontStyle === 'bold' ? 700 : 400,
+            'fontStyle' in element
+                ? { normal: 400, '600': 600, bold: 700, '800': 800 }[
+                      element.fontStyle
+                  ]
+                : 400,
         lineHeight: 1.2,
     };
 
     switch (element.type) {
+        case 'ornament':
+            return (
+                <image
+                    {...box}
+                    href={ornamentUrl(element.ornamentId, element.fill)}
+                    preserveAspectRatio="none"
+                />
+            );
         case 'rect':
             return (
                 <rect {...box} rx={element.cornerRadius} fill={element.fill} />
@@ -55,7 +68,16 @@ function PreviewElement({
                             whiteSpace: 'pre-wrap',
                         }}
                     >
-                        {element.text}
+                        {element.spans?.length
+                            ? element.spans.map((span, index) => (
+                                  <span
+                                      key={index}
+                                      style={{ color: span.fill }}
+                                  >
+                                      {span.text}{' '}
+                                  </span>
+                              ))
+                            : element.text}
                     </div>
                 </foreignObject>
             );

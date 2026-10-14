@@ -87,11 +87,17 @@ class DocumentNormalizer
             'fontStyle' => (string) ($element['fontStyle'] ?? 'normal'),
         ];
 
+        $spans = $type === 'text' ? $this->spans($element['spans'] ?? null) : [];
+
+        if ($spans !== []) {
+            $font['text'] = implode(' ', array_column($spans, 'text'));
+        }
+
         return $base + match ($type) {
             'text' => $font + [
                 'align' => (string) ($element['align'] ?? 'left'),
                 'fill' => strtolower((string) ($element['fill'] ?? '#1f2937')),
-            ],
+            ] + ($spans === [] ? [] : ['spans' => $spans]),
             'button' => $font + [
                 'fill' => strtolower((string) ($element['fill'] ?? '#f97316')),
                 'textColor' => strtolower((string) ($element['textColor'] ?? '#ffffff')),
@@ -104,10 +110,33 @@ class DocumentNormalizer
             'circle' => [
                 'fill' => strtolower((string) ($element['fill'] ?? '#f97316')),
             ],
+            'ornament' => [
+                'ornamentId' => (string) $element['ornamentId'],
+                'fill' => strtolower((string) ($element['fill'] ?? '#f97316')),
+            ],
             default => [
                 'assetId' => (string) $element['assetId'],
             ],
         };
+    }
+
+    /**
+     * @return list<array{text: string, fill: string}>
+     */
+    private function spans(mixed $spans): array
+    {
+        $clean = [];
+
+        foreach (is_array($spans) ? $spans : [] as $span) {
+            $text = trim((string) ($span['text'] ?? ''));
+
+            if ($text !== '') {
+                $clean[] = ['text' => $text, 'fill' => strtolower((string) $span['fill'])];
+            }
+        }
+
+        // A single color needs no spans: the element's own fill covers it.
+        return count($clean) > 1 ? $clean : [];
     }
 
     private function number(mixed $value): float|int

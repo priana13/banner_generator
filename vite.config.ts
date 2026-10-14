@@ -20,7 +20,10 @@ export default defineConfig({
                 // in sync with config/banner.php.
                 ...['Inter', 'Poppins', 'Montserrat', 'Playfair Display'].map(
                     (family) =>
-                        bunny(family, { weights: [400, 700], preload: false }),
+                        bunny(family, {
+                            weights: [400, 600, 700, 800],
+                            preload: false,
+                        }),
                 ),
             ],
         }),
@@ -71,6 +74,7 @@ export default defineConfig({
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
             '.github/**',
+            '.lerd.yaml',
             'ai-banner-generator-prd-mvp.md',
             'composer.json',
             'resources/js/components/ui/*',

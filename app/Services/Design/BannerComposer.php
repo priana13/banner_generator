@@ -14,10 +14,31 @@ use Illuminate\Support\Str;
  * @phpstan-import-type DesignSpec from DesignSpecNormalizer
  *
  * @phpstan-type Box array{x: int, y: int, width: int, height: int}
+ * @phpstan-type Document array{schemaVersion: int, canvas: array{width: int, height: int, backgroundColor: string}, elements: list<array<string, mixed>>}
  */
 class BannerComposer
 {
+    /** Colored panel next to the copy, with an AI image. */
+    public const STYLE_PANEL = 'panel';
+
+    /** Light background, ornaments and a photo with its background removed. */
+    public const STYLE_CUTOUT = 'cutout';
+
+    public const STYLES = [self::STYLE_PANEL, self::STYLE_CUTOUT];
+
     private const LINE_HEIGHT = 1.2;
+
+    /** Type scale as fractions of the text box height. */
+    private const TYPOGRAPHY = [
+        self::STYLE_PANEL => [
+            'font' => 'Inter', 'headline' => 0.15, 'headlineStyle' => 'bold',
+            'subheadline' => 0.065, 'body' => 0.056, 'label' => 0.046, 'button' => 2.6, 'pill' => false,
+        ],
+        self::STYLE_CUTOUT => [
+            'font' => 'Poppins', 'headline' => 0.25, 'headlineStyle' => '800',
+            'subheadline' => 0.083, 'body' => 0.06, 'label' => 0.046, 'button' => 2.5, 'pill' => true,
+        ],
+    ];
 
     public function __construct(private DocumentNormalizer $normalizer) {}
 
@@ -26,10 +47,10 @@ class BannerComposer
      *
      * @return Box
      */
-    public function visualBox(int $width, int $height, string $layout): array
+    public function visualBox(int $width, int $height, string $layout, float $share = 0.38): array
     {
         if ($this->isWide($width, $height)) {
-            $panelWidth = (int) round($width * 0.38);
+            $panelWidth = (int) round($width * $share);
 
             return [
                 'x' => $layout === 'visual-left' ? 0 : $width - $panelWidth,
@@ -45,10 +66,12 @@ class BannerComposer
     }
 
     /**
+     * The "panel" style.
+     *
      * @param  DesignSpec  $spec
      * @param  Asset|null  $visual  AI image generated at the exact size of the visual box.
      * @param  Asset|null  $background  AI image generated at the exact size of the canvas.
-     * @return array{schemaVersion: int, canvas: array{width: int, height: int, backgroundColor: string}, elements: list<array<string, mixed>>}
+     * @return Document
      */
     public function compose(
         array $spec,
@@ -62,7 +85,6 @@ class BannerComposer
         $height = $brief->height;
         $accent = strtolower($brief->accentColor);
         $panel = $this->visualBox($width, $height, $spec['layout']);
-        $textBox = $this->textBox($width, $height, $panel);
         $elements = [];
 
         if ($background !== null) {
@@ -97,37 +119,155 @@ class BannerComposer
             ];
         }
 
-        return $this->normalizer->normalize([
-            'canvas' => ['width' => $width, 'height' => $height, 'backgroundColor' => $spec['backgroundColor']],
-            'elements' => array_map(
-                fn (array $element): array => ['id' => (string) Str::uuid(), ...$element],
-                [...$elements, ...$this->copy($spec, $accent, $textBox, $logo)],
-            ),
+        $textBox = $this->inset($this->textPanel($width, $height, $panel), $this->isWide($width, $height) ? 0.13 : 0.1);
+
+        return $this->document($width, $height, $spec['backgroundColor'], [
+            ...$elements,
+            ...$this->copy($spec, self::STYLE_PANEL, $textBox, $logo, [
+                'label' => $this->readable($accent, $spec['textColor'], $spec['backgroundColor']),
+                'headline' => $spec['textColor'],
+                'subheadline' => $spec['textColor'],
+                'description' => Color::mix($spec['textColor'], $spec['backgroundColor'], 0.3),
+                'button' => $spec['ctaColor'] ?? $accent,
+            ]),
         ]);
     }
 
     /**
-     * Stack logo, label, headline, description and CTA inside the text box,
-     * shrinking the type scale until the whole block fits.
+     * The "cutout" style: white canvas, soft glow, thin wave lines, leaves,
+     * and the photo (ideally with its background removed) standing on the
+     * bottom edge with foliage in front of it.
      *
      * @param  DesignSpec  $spec
+     * @return Document
+     */
+    public function composeCutout(array $spec, DesignBrief $brief, ?Asset $photo = null, ?Asset $logo = null): array
+    {
+        $width = $brief->width;
+        $height = $brief->height;
+        $accent = strtolower($brief->accentColor);
+        $dark = Color::mix($accent, '#000000', 0.45);
+        $wide = $this->isWide($width, $height);
+        $panel = $this->visualBox($width, $height, $spec['layout'], 0.4);
+        $textPanel = $this->textPanel($width, $height, $panel);
+        $short = min($width, $height);
+
+        $ornament = fn (string $id, string $name, int $x, int $y, int $w, int $h, float $opacity = 1, int $rotation = 0): array => [
+            'type' => 'ornament', 'ornamentId' => $id, 'name' => $name, 'fill' => $accent,
+            'x' => $x, 'y' => $y, 'width' => max(1, $w), 'height' => max(1, $h),
+            'opacity' => $opacity, 'rotation' => $rotation,
+        ];
+
+        // Backdrop: a faint wash over the copy and a stronger glow where the
+        // photo goes, then the parallel wave lines.
+        $glow = (int) round(min($panel['width'], $panel['height']) * 1.05);
+        $elements = [
+            [...$ornament('glow', 'Gradasi lembut', 0, 0, (int) round($textPanel['width'] * 0.7), $textPanel['height'], 0.3), 'locked' => true],
+            [
+                ...$ornament(
+                    'glow', 'Pendar foto',
+                    (int) round($panel['x'] + ($panel['width'] - $glow) / 2),
+                    (int) round($panel['y'] + ($panel['height'] - $glow) / 2),
+                    $glow, $glow, 0.9,
+                ),
+                'locked' => true,
+            ],
+            $ornament('waves', 'Garis lengkung atas', 0, 0, (int) round($width * 0.3), (int) round($height * 0.36), 0.7),
+            $ornament(
+                'waves', 'Garis lengkung bawah',
+                (int) round($textPanel['x'] + $textPanel['width'] * 0.45), (int) round($height * 0.7),
+                (int) round($textPanel['width'] * 0.5), (int) round($height * 0.3), 0.7,
+            ),
+        ];
+
+        if ($photo !== null) {
+            // Stand the subject on the bottom edge, never cropped at the top.
+            $box = $this->contain($photo, [
+                'x' => $panel['x'], 'y' => $panel['y'] + (int) round($panel['height'] * 0.05),
+                'width' => $panel['width'], 'height' => (int) round($panel['height'] * 0.95),
+            ]);
+            $elements[] = [
+                'type' => 'image', 'name' => 'Foto', 'assetId' => $photo->id,
+                ...$box, 'y' => $panel['y'] + $panel['height'] - $box['height'],
+            ];
+
+            $foliage = min((int) round($panel['height'] * 0.24), (int) round($panel['width'] / 3));
+            $elements[] = $ornament(
+                'foliage', 'Dedaunan', $panel['x'], $panel['y'] + $panel['height'] - $foliage, $panel['width'], $foliage,
+            );
+        }
+
+        $leaf = (int) round($short * 0.085);
+        $leafHeight = (int) round($leaf * 0.58);
+
+        foreach ([[0.01, 0.47, -28], [0.9, 0.15, 24], [0.8, 0.84, 150]] as $index => [$fx, $fy, $rotation]) {
+            $elements[] = $ornament(
+                'leaf', 'Daun '.($index + 1),
+                (int) round($textPanel['x'] + $textPanel['width'] * $fx),
+                (int) round($textPanel['y'] + $textPanel['height'] * $fy),
+                (int) round($leaf * (1 - $index * 0.15)), (int) round($leafHeight * (1 - $index * 0.15)),
+                1, $rotation,
+            );
+        }
+
+        // Unless told otherwise, the headline goes from the brand color to a
+        // deeper shade of it, like the CTA.
+        $spans = $spec['headlineSpans'];
+        $last = count($spans) - 1;
+
+        foreach ($spans as $index => $span) {
+            $fill = $span['fill'] ?? ($index === $last ? $dark : $accent);
+            $spans[$index]['fill'] = Color::contrast($fill, '#ffffff') >= 1.8 ? $fill : $dark;
+        }
+
+        $textBox = $this->inset($textPanel, $wide ? 0.13 : 0.1);
+
+        if ($wide) {
+            // Keep clear of the photo.
+            $textBox['width'] -= (int) round($textPanel['width'] * 0.04);
+        }
+
+        return $this->document($width, $height, '#ffffff', [
+            ...$elements,
+            ...$this->copy([...$spec, 'label' => '', 'headlineSpans' => $spans], self::STYLE_CUTOUT, $textBox, $logo, [
+                'label' => $dark,
+                'headline' => $dark,
+                'subheadline' => '#3f3f46',
+                'description' => '#52525b',
+                'button' => $spec['ctaColor'] ?? $dark,
+            ]),
+        ]);
+    }
+
+    /**
+     * Stack logo, label, headline, subheadline, description and CTA inside
+     * the text box, shrinking the type scale until the whole block fits.
+     *
+     * @param  DesignSpec  $spec
+     * @param  self::STYLE_*  $style
      * @param  Box  $box
+     * @param  array{label: string, headline: string, subheadline: string, description: string, button: string}  $colors
      * @return list<array<string, mixed>>
      */
-    private function copy(array $spec, string $accent, array $box, ?Asset $logo): array
+    private function copy(array $spec, string $style, array $box, ?Asset $logo, array $colors): array
     {
+        $type = self::TYPOGRAPHY[$style];
+        $heights = $sizes = ['label' => 0, 'headline' => 0, 'subheadline' => 0, 'description' => 0];
         $unit = min($box['height'], $box['width'] * 0.75);
 
         // Shrink the type scale first; if the copy still does not fit (tiny
         // banners), drop the optional lines rather than overflow the canvas.
-        foreach ([[], ['description'], ['description', 'label']] as $dropped) {
+        foreach ([[], ['description'], ['description', 'subheadline'], ['description', 'subheadline', 'label']] as $dropped) {
             $spec = [...$spec, ...array_fill_keys($dropped, '')];
             $scale = 1.0;
 
             do {
-                $labelSize = max(8, (int) round($unit * 0.046 * $scale));
-                $headlineSize = max(10, (int) round($unit * 0.15 * $scale));
-                $bodySize = max(9, (int) round($unit * 0.056 * $scale));
+                $sizes = [
+                    'label' => max(8, (int) round($unit * $type['label'] * $scale)),
+                    'headline' => max(10, (int) round($unit * $type['headline'] * $scale)),
+                    'subheadline' => max(9, (int) round($unit * $type['subheadline'] * $scale)),
+                    'description' => max(9, (int) round($unit * $type['body'] * $scale)),
+                ];
                 $gap = (int) round($unit * 0.045 * $scale);
 
                 $logoBox = $logo === null ? null : $this->contain($logo, [
@@ -135,13 +275,15 @@ class BannerComposer
                     'width' => (int) round($box['width'] * 0.4), 'height' => (int) round($unit * 0.15 * $scale),
                 ], center: false);
 
-                $labelHeight = $spec['label'] === '' ? 0 : $this->textHeight($spec['label'], $labelSize, $box['width'], true);
-                $headlineHeight = $this->textHeight($spec['headline'], $headlineSize, $box['width'], true);
-                $bodyHeight = $spec['description'] === '' ? 0 : $this->textHeight($spec['description'], $bodySize, $box['width'], false);
-                $buttonHeight = (int) round($bodySize * 2.6);
+                foreach ($sizes as $key => $size) {
+                    $heights[$key] = $spec[$key] === ''
+                        ? 0
+                        : $this->textHeight($spec[$key], $size, $box['width'], $key !== 'description');
+                }
 
-                $heights = array_filter([$logoBox['height'] ?? 0, $labelHeight, $headlineHeight, $bodyHeight, $buttonHeight]);
-                $total = array_sum($heights) + $gap * (count($heights) - 1);
+                $buttonHeight = (int) round($sizes['description'] * $type['button']);
+                $stack = array_filter([$logoBox['height'] ?? 0, ...array_values($heights), $buttonHeight]);
+                $total = array_sum($stack) + $gap * (count($stack) - 1);
                 $fits = $total <= $box['height'];
                 $scale *= 0.94;
             } while (! $fits && $scale > 0.3);
@@ -159,47 +301,66 @@ class BannerComposer
             $y += $logoBox['height'] + $gap;
         }
 
-        $text = fn (string $name, string $content, int $top, int $size, int $height, string $fill, bool $bold): array => [
-            'type' => 'text', 'name' => $name, 'text' => $content,
-            'x' => $box['x'], 'y' => $top, 'width' => $box['width'], 'height' => $height,
-            'fontFamily' => 'Inter', 'fontSize' => $size, 'fontStyle' => $bold ? 'bold' : 'normal', 'fill' => $fill,
+        $lines = [
+            'label' => ['Label', 'bold'],
+            'headline' => ['Judul utama', $type['headlineStyle']],
+            'subheadline' => ['Subjudul', '600'],
+            'description' => ['Deskripsi', 'normal'],
         ];
 
-        if ($labelHeight > 0) {
-            $elements[] = $text('Label', $spec['label'], $y, $labelSize, $labelHeight, $this->readable($accent, $spec), true);
-            $y += $labelHeight + $gap;
+        foreach ($lines as $key => [$name, $fontStyle]) {
+            if ($heights[$key] === 0) {
+                continue;
+            }
+
+            $elements[] = [
+                'type' => 'text', 'name' => $name, 'text' => $spec[$key],
+                'x' => $box['x'], 'y' => $y, 'width' => $box['width'], 'height' => $heights[$key],
+                'fontFamily' => $type['font'], 'fontSize' => $sizes[$key], 'fontStyle' => $fontStyle,
+                'fill' => $colors[$key],
+                ...($key === 'headline' ? ['spans' => array_map(
+                    fn (array $span): array => ['text' => $span['text'], 'fill' => $span['fill'] ?? $colors['headline']],
+                    $spec['headlineSpans'],
+                )] : []),
+            ];
+            $y += $heights[$key] + $gap;
         }
 
-        $elements[] = $text('Judul utama', $spec['headline'], $y, $headlineSize, $headlineHeight, $spec['textColor'], true);
-        $y += $headlineHeight + $gap;
-
-        if ($bodyHeight > 0) {
-            $muted = Color::mix($spec['textColor'], $spec['backgroundColor'], 0.3);
-            $elements[] = $text('Deskripsi', $spec['description'], $y, $bodySize, $bodyHeight, $muted, false);
-            $y += $bodyHeight + $gap;
-        }
-
-        $buttonWidth = (int) round(mb_strlen($spec['cta']) * $bodySize * 0.62 + $bodySize * 3.2);
+        $buttonSize = $sizes['description'];
+        $buttonWidth = (int) round(mb_strlen($spec['cta']) * $buttonSize * 0.62 + $buttonSize * 3.2);
         $elements[] = [
             'type' => 'button', 'name' => 'Tombol CTA', 'text' => $spec['cta'],
             'x' => $box['x'], 'y' => $y, 'width' => min($box['width'], $buttonWidth), 'height' => $buttonHeight,
-            'fontFamily' => 'Inter', 'fontSize' => $bodySize, 'fontStyle' => 'bold',
-            'fill' => $accent,
-            'textColor' => Color::contrast('#ffffff', $accent) >= 2.2 ? '#ffffff' : '#111827',
-            'cornerRadius' => (int) round($buttonHeight * 0.26),
+            'fontFamily' => $type['font'], 'fontSize' => $buttonSize, 'fontStyle' => $type['pill'] ? '600' : 'bold',
+            'fill' => $colors['button'],
+            'textColor' => Color::contrast('#ffffff', $colors['button']) >= 2.2 ? '#ffffff' : '#111827',
+            'cornerRadius' => (int) round($buttonHeight * ($type['pill'] ? 0.5 : 0.26)),
         ];
 
         return $elements;
     }
 
     /**
-     * Use the accent for small copy only when it is legible on the background.
-     *
-     * @param  DesignSpec  $spec
+     * @param  list<array<string, mixed>>  $elements
+     * @return Document
      */
-    private function readable(string $accent, array $spec): string
+    private function document(int $width, int $height, string $backgroundColor, array $elements): array
     {
-        return Color::contrast($accent, $spec['backgroundColor']) >= 2.5 ? $accent : $spec['textColor'];
+        return $this->normalizer->normalize([
+            'canvas' => ['width' => $width, 'height' => $height, 'backgroundColor' => $backgroundColor],
+            'elements' => array_map(
+                fn (array $element): array => ['id' => (string) Str::uuid(), ...$element],
+                $elements,
+            ),
+        ]);
+    }
+
+    /**
+     * Use the accent for small copy only when it is legible on the background.
+     */
+    private function readable(string $accent, string $textColor, string $backgroundColor): string
+    {
+        return Color::contrast($accent, $backgroundColor) >= 2.5 ? $accent : $textColor;
     }
 
     /**
@@ -235,17 +396,6 @@ class BannerComposer
         }
 
         return (int) ceil($lines * $fontSize * self::LINE_HEIGHT);
-    }
-
-    /**
-     * The padded column the copy lives in.
-     *
-     * @param  Box  $panel
-     * @return Box
-     */
-    private function textBox(int $width, int $height, array $panel): array
-    {
-        return $this->inset($this->textPanel($width, $height, $panel), $this->isWide($width, $height) ? 0.13 : 0.1);
     }
 
     /**

@@ -40,6 +40,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<PromptPreset, $this>
+     */
+    public function promptPresets(): HasMany
+    {
+        return $this->hasMany(PromptPreset::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

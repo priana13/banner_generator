@@ -11,7 +11,10 @@ final class DocumentRules
 {
     public const SCHEMA_VERSION = 1;
 
-    public const ELEMENT_TYPES = ['text', 'button', 'rect', 'circle', 'image'];
+    public const ELEMENT_TYPES = ['text', 'button', 'rect', 'circle', 'image', 'ornament'];
+
+    /** Regular, SemiBold, Bold and ExtraBold. */
+    public const FONT_STYLES = ['normal', '600', 'bold', '800'];
 
     /**
      * @return array<string, array<int, mixed>>
@@ -45,12 +48,20 @@ final class DocumentRules
             "{$el}.text" => ['nullable', 'string', 'max:2000'],
             "{$el}.fontFamily" => ['nullable', 'string', Rule::in(config()->array('banner.fonts'))],
             "{$el}.fontSize" => ['nullable', 'numeric', 'between:4,1000'],
-            "{$el}.fontStyle" => ['nullable', 'string', Rule::in(['normal', 'bold'])],
+            "{$el}.fontStyle" => ['nullable', 'string', Rule::in(self::FONT_STYLES)],
+            // Optional per-fragment colors of a text element.
+            "{$el}.spans" => ['nullable', 'array', 'max:8'],
+            "{$el}.spans.*.text" => ['required', 'string', 'max:500'],
+            "{$el}.spans.*.fill" => ['required', 'string', $color],
             "{$el}.align" => ['nullable', 'string', Rule::in(['left', 'center', 'right'])],
             "{$el}.fill" => ['nullable', 'string', $color],
             "{$el}.textColor" => ['nullable', 'string', $color],
             "{$el}.cornerRadius" => ['nullable', 'numeric', 'between:0,10000'],
             "{$el}.assetId" => ["required_if:{$el}.type,image", 'nullable', 'uuid'],
+            "{$el}.ornamentId" => [
+                "required_if:{$el}.type,ornament", 'nullable', 'string',
+                Rule::in(array_keys(config()->array('banner.ornaments'))),
+            ],
         ];
     }
 }

@@ -1,6 +1,24 @@
 # Rencana: Banner Gaya "Foto Cutout" (lanjutan MVP)
 
-Dibuat: 13 Oktober 2026 · Status: belum dimulai
+Dibuat: 13 Oktober 2026 · Diperbarui: 14 Oktober 2026 · Status: versi pertama keempat tahap sudah dibuat
+
+## Status per 14 Oktober 2026
+
+Sudah dibuat (versi pertama):
+
+- **Hapus latar foto** — dikerjakan di browser (transformers.js + model MODNet), bukan di server atau API. Foto tidak keluar dari perangkat pengguna. Ini menggantikan pilihan (a)/(b) pada keputusan 1 di bawah; tetap bisa diganti nanti.
+- **Judul multi-warna, subjudul, ketebalan font** (Regular/SemiBold/Bold/ExtraBold). Skema tetap `schemaVersion: 1` karena perubahannya hanya menambah properti opsional.
+- **Template "cutout"** di `BannerComposer::composeCutout()`, dipilih lewat "Gaya desain" di form.
+- **Ornamen** bawaan: garis lengkung, daun, dedaunan, pendar (`resources/js/lib/ornaments.ts`).
+- **Prompt tersimpan** per pengguna, serta export/import prompt sebagai berkas.
+
+Belum dibuat / masih perlu dikerjakan:
+
+- Ilustrasi pangan (beras, paket sembako) dan daun yang realistis: ornamen saat ini vektor bergaya sederhana.
+- Efek bayangan umum per elemen (pendar hanya tersedia sebagai ornamen).
+- Uji kualitas hapus latar pada foto nyata santri (jilbab, peci, foto kelompok).
+- Model dan runtime hapus latar masih diunduh dari huggingface.co dan cdn.jsdelivr.net saat pertama dipakai; untuk produksi sebaiknya di-host sendiri.
+- Uji langsung prompt panjang lewat 9router (saat pengujian, tunnel 9router sedang tidak dapat dijangkau).
 
 ## Tujuan
 
@@ -28,11 +46,11 @@ Belum ada:
 
 ## Keputusan yang masih terbuka
 
-| # | Keputusan | Pilihan | Rekomendasi |
-|---|---|---|---|
-| 1 | Cara menghapus latar foto | (a) Model lokal di server (rembg) · (b) API berbayar (remove.bg, fal, Replicate) | **(a) lokal.** Foto yang diproses sering foto anak-anak, dan PRD §10 melarang mengirim foto pribadi ke penyedia AI tanpa izin. |
-| 2 | Sumber ornamen | (a) Pustaka bawaan buatan sendiri · (b) Dihasilkan model gambar | **(a) pustaka bawaan** dulu: hasilnya konsisten dan gratis. |
-| 3 | Model gambar AI | GPT Image / FLUX / Imagen, atau tetap tanpa model gambar | Tidak wajib untuk gaya ini, karena visual utamanya foto unggahan. Bisa ditunda. |
+| #   | Keputusan                 | Pilihan                                                                          | Rekomendasi                                                                                                                    |
+| --- | ------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Cara menghapus latar foto | (a) Model lokal di server (rembg) · (b) API berbayar (remove.bg, fal, Replicate) | **(a) lokal.** Foto yang diproses sering foto anak-anak, dan PRD §10 melarang mengirim foto pribadi ke penyedia AI tanpa izin. |
+| 2   | Sumber ornamen            | (a) Pustaka bawaan buatan sendiri · (b) Dihasilkan model gambar                  | **(a) pustaka bawaan** dulu: hasilnya konsisten dan gratis.                                                                    |
+| 3   | Model gambar AI           | GPT Image / FLUX / Imagen, atau tetap tanpa model gambar                         | Tidak wajib untuk gaya ini, karena visual utamanya foto unggahan. Bisa ditunda.                                                |
 
 Keputusan 1 harus diambil sebelum Tahap 1 dimulai. Rancangan di bawah memakai adapter, jadi pilihan (a) dan (b) bisa ditukar lewat konfigurasi.
 
@@ -44,8 +62,8 @@ Dampak terbesar; tahap lain tidak bergantung padanya.
 
 - Kontrak baru `App\Services\Ai\Contracts\BackgroundRemover` dengan satu method: terima bytes gambar, kembalikan PNG transparan.
 - Implementasi sesuai keputusan 1:
-  - Lokal: layanan kecil rembg (Python) yang dipanggil lewat HTTP di jaringan internal, atau lewat proses CLI.
-  - API: adapter HTTP ke penyedia terpilih.
+    - Lokal: layanan kecil rembg (Python) yang dipanggil lewat HTTP di jaringan internal, atau lewat proses CLI.
+    - API: adapter HTTP ke penyedia terpilih.
 - Job antrean `RemoveBackgroundJob`, memakai tabel `generation_jobs` yang sudah ada dengan kolom pembeda `type` (`banner` | `remove_background`). Status, batal, dan retry ikut mekanisme yang sama.
 - Endpoint `POST /api/projects/{project}/assets/{asset}/remove-background` → mengembalikan job.
 - Hasil disimpan sebagai **aset baru** (`kind: cutout`, `metadata.source_asset_id`), aset asli tidak diubah.
@@ -94,8 +112,8 @@ Dampak terbesar; tahap lain tidak bergantung padanya.
 **Backend**
 
 - `BannerComposer` dipecah menjadi beberapa template yang memakai mesin penyusun teks yang sama:
-  - `panel` (yang sekarang),
-  - `cutout`: latar terang, tanpa panel warna, foto di satu sisi dan boleh melewati tepi bawah/kanan.
+    - `panel` (yang sekarang),
+    - `cutout`: latar terang, tanpa panel warna, foto di satu sisi dan boleh melewati tepi bawah/kanan.
 - Pemilihan template: otomatis `cutout` bila foto unggahan berupa aset cutout; bisa dipilih manual di form brief.
 - Urutan teks baru: judul → subjudul → deskripsi → tombol.
 

@@ -52,6 +52,49 @@ class LocalLayoutProvider implements LayoutProvider
         ],
     ];
 
+    /**
+     * The quoted text following a `Label:` marker (markdown emphasis allowed).
+     */
+    private function quoted(string $prompt, string $labels): ?string
+    {
+        $found = preg_match(
+            '/(?<![\p{L}])(?:'.$labels.')\s*:?[\s*_]*:?[\s*_]*["“]([^"”\n]{2,220})["”]/iu',
+            $prompt,
+            $match,
+        );
+
+        return $found === 1 ? trim($match[1]) : null;
+    }
+
+    /**
+     * Split the headline by instructions such as `(#65B32E) untuk kata "Sedekah Pangan"`.
+     *
+     * @return list<array{text: string, color: string}>
+     */
+    private function segments(string $prompt, string $headline): array
+    {
+        preg_match_all(
+            '/(#[0-9a-f]{6})\)?\s+(?:untuk|for)\s+(?:kata|the\s+words?)\s+["“]([^"”\n]+)["”]/iu',
+            $prompt,
+            $matches,
+            PREG_SET_ORDER,
+        );
+
+        $segments = [];
+        $rest = $headline;
+
+        foreach ($matches as [, $color, $words]) {
+            if (! Str::startsWith($rest, $words)) {
+                return [];
+            }
+
+            $segments[] = ['text' => $words, 'color' => $color];
+            $rest = ltrim(Str::after($rest, $words));
+        }
+
+        return $rest === '' ? $segments : [];
+    }
+
     public function name(): string
     {
         return 'local';
@@ -81,6 +124,20 @@ class LocalLayoutProvider implements LayoutProvider
 
         if (preg_match('/tombol\s+["“\']?([\p{L} ]{3,28}?)["”\']?(?:[.,]|$)/iu', $brief->prompt, $match) === 1) {
             $spec['cta'] = Str::title(trim($match[1]));
+        }
+
+        // Exact wording given as `Headline: "..."` wins over the templates.
+        $explicit = array_filter([
+            'headline' => $this->quoted($brief->prompt, 'headline|judul'),
+            'subheadline' => $this->quoted($brief->prompt, 'subheadline|subjudul'),
+            'description' => $this->quoted($brief->prompt, 'deskripsi|description'),
+            'cta' => $this->quoted($brief->prompt, '(?:tombol\s+)?cta'),
+        ]);
+
+        if (isset($explicit['headline'])) {
+            $spec = ['label' => '', 'description' => '', ...$spec, ...$explicit];
+            $spec['label'] = '';
+            $spec['headlineSegments'] = $this->segments($brief->prompt, $explicit['headline']);
         }
 
         return new LayoutResult([

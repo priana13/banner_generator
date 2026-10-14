@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AssetController as ApiAssetController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\GenerationController;
 use App\Http\Controllers\Api\ProjectController as ApiProjectController;
+use App\Http\Controllers\Api\PromptPresetController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\ProjectController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('projects/{project}/revisions', [ApiProjectController::class, 'revisions'])->name('projects.revisions');
         Route::post('projects/{project}/assets', [ApiAssetController::class, 'store'])->name('projects.assets.store');
         Route::post('projects/{project}/export', [ExportController::class, 'store'])->name('projects.export');
+
+        Route::get('prompt-presets', [PromptPresetController::class, 'index'])->name('prompt-presets.index');
+        Route::post('prompt-presets', [PromptPresetController::class, 'store'])->name('prompt-presets.store');
+        Route::delete('prompt-presets/{promptPreset}', [PromptPresetController::class, 'destroy'])->name('prompt-presets.destroy');
 
         Route::post('projects/{project}/generate', [GenerationController::class, 'store'])
             ->middleware('throttle:generate')

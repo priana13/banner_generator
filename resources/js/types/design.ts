@@ -11,11 +11,16 @@ type BaseElement = {
     locked: boolean;
 };
 
+export type FontStyle = 'normal' | '600' | 'bold' | '800';
+
+export type TextSpan = { text: string; fill: string };
+
 type FontProps = {
     text: string;
     fontFamily: string;
     fontSize: number;
-    fontStyle: 'normal' | 'bold';
+    /** Regular, SemiBold, Bold or ExtraBold. */
+    fontStyle: FontStyle;
 };
 
 export type TextElement = BaseElement &
@@ -23,6 +28,11 @@ export type TextElement = BaseElement &
         type: 'text';
         align: 'left' | 'center' | 'right';
         fill: string;
+        /**
+         * Optional per-fragment colors. When present, `text` is the
+         * fragments joined with spaces.
+         */
+        spans?: TextSpan[];
     };
 
 export type ButtonElement = BaseElement &
@@ -49,7 +59,15 @@ export type ImageElement = BaseElement & {
     assetId: string;
 };
 
+/** A built-in decorative vector (see lib/ornaments.ts). */
+export type OrnamentElement = BaseElement & {
+    type: 'ornament';
+    ornamentId: string;
+    fill: string;
+};
+
 export type DesignElement =
+    | OrnamentElement
     | TextElement
     | ButtonElement
     | RectElement
@@ -60,8 +78,9 @@ export type DesignElement =
 export type ElementPatch = Partial<
     Omit<TextElement, 'id' | 'type'> &
         Omit<ButtonElement, 'id' | 'type'> &
-        Omit<RectElement, 'id' | 'type'>
->;
+        Omit<RectElement, 'id' | 'type'> &
+        Omit<ImageElement, 'id' | 'type'>
+> & { spans?: TextSpan[] | undefined };
 
 export type DesignCanvas = {
     width: number;
@@ -78,7 +97,7 @@ export type DesignDocument = {
 
 export type EditorAsset = {
     id: string;
-    kind: 'upload' | 'logo' | 'generated';
+    kind: 'upload' | 'logo' | 'cutout' | 'generated';
     url: string;
     width: number;
     height: number;
@@ -103,6 +122,21 @@ export type EditorPayload = {
     version: number;
     assets: EditorAsset[];
     job: GenerationJob | null;
+    brief: {
+        prompt: string;
+        primary_color: string | null;
+        style: BannerStyle | null;
+    } | null;
+};
+
+export type BannerStyle = 'cutout' | 'panel';
+
+export type PromptPreset = {
+    id: number;
+    name: string;
+    prompt: string;
+    primary_color: string | null;
+    style: BannerStyle | null;
 };
 
 export type ProjectSummary = {

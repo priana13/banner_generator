@@ -10,7 +10,7 @@ import {
     show as jobRoute,
 } from '@/routes/api/generation-jobs';
 import { generate, show as projectRoute } from '@/routes/api/projects';
-import type { EditorPayload, GenerationJob } from '@/types';
+import type { BannerStyle, EditorPayload, GenerationJob } from '@/types';
 
 const POLL_INTERVAL_MS = 1500;
 
@@ -18,10 +18,28 @@ export type GenerationBrief = {
     prompt: string;
     photoAssetId: string | null;
     logoAssetId: string | null;
+    style: BannerStyle;
 };
 
 function isActive(job: GenerationJob | null): boolean {
     return job?.status === 'queued' || job?.status === 'running';
+}
+
+/** Load the document a finished job produced into the editor. */
+async function loadResult(
+    projectId: number,
+    isCancelled: () => boolean,
+): Promise<void> {
+    const payload = await api<EditorPayload>(projectRoute(projectId));
+
+    if (isCancelled()) {
+        return;
+    }
+
+    useEditorStore
+        .getState()
+        .applyGenerated(payload.document, payload.assets, payload.version);
+    toast.success('Banner berhasil dibuat.');
 }
 
 /**
@@ -61,22 +79,7 @@ export function useGeneration(
                     }
 
                     if (latest.status === 'succeeded') {
-                        const payload = await api<EditorPayload>(
-                            projectRoute(projectId),
-                        );
-
-                        if (cancelled) {
-                            return;
-                        }
-
-                        useEditorStore
-                            .getState()
-                            .applyGenerated(
-                                payload.document,
-                                payload.assets,
-                                payload.version,
-                            );
-                        toast.success('Banner berhasil dibuat.');
+                        await loadResult(projectId, () => cancelled);
                     }
 
                     setJob(latest);
@@ -106,7 +109,15 @@ export function useGeneration(
                 );
             }
 
-            setJob(await request());
+            const started = await request();
+
+            // A fast worker can finish before the request returns, in
+            // which case there is nothing left to poll for.
+            if (started.status === 'succeeded') {
+                await loadResult(projectId, () => false);
+            }
+
+            setJob(started);
         } catch (caught) {
             setError(errorMessage(caught));
         } finally {
@@ -125,6 +136,7 @@ export function useGeneration(
                 height: document.canvas.height,
                 photo_asset_id: brief.photoAssetId,
                 logo_asset_id: brief.logoAssetId,
+                style: brief.style,
                 idempotency_key: uid(),
             });
         });

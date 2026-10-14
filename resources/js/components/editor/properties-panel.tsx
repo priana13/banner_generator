@@ -4,12 +4,18 @@ import {
     AlignRight,
     ArrowDown,
     ArrowUp,
-    Bold,
+    Eraser,
+    LoaderCircle,
 } from 'lucide-react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
+import { errorMessage } from '@/lib/api';
+import { removeBackground } from '@/lib/background-removal';
+import { uploadImage } from '@/lib/image-processing';
 import { useEditorStore, useSelectedElement } from '@/lib/editor-store';
 import { cn } from '@/lib/utils';
-import type { ElementPatch } from '@/types';
+import type { ElementPatch, FontStyle, ImageElement, TextSpan } from '@/types';
 
 const inputClass =
     'mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm';
@@ -19,6 +25,89 @@ const ALIGNMENTS = [
     { value: 'center', label: 'Rata tengah', icon: AlignCenter },
     { value: 'right', label: 'Rata kanan', icon: AlignRight },
 ] as const;
+
+const FONT_STYLES: { value: FontStyle; label: string }[] = [
+    { value: 'normal', label: 'Regular' },
+    { value: '600', label: 'SemiBold' },
+    { value: 'bold', label: 'Bold' },
+    { value: '800', label: 'ExtraBold' },
+];
+
+/**
+ * Replace a photo with a version whose background was removed. The original
+ * asset is kept, so the change can be undone.
+ */
+function RemoveBackgroundButton({
+    projectId,
+    element,
+}: {
+    projectId: number;
+    element: ImageElement;
+}) {
+    const asset = useEditorStore((state) => state.assets[element.assetId]);
+    const [working, setWorking] = useState(false);
+
+    if (!asset || asset.kind === 'cutout') {
+        return null;
+    }
+
+    const run = async (): Promise<void> => {
+        setWorking(true);
+
+        try {
+            const photo = await (await fetch(asset.url)).blob();
+            const cutout = await uploadImage(
+                projectId,
+                await removeBackground(photo),
+                'cutout',
+                'cutout.png',
+            );
+
+            // The cutout is cropped to its subject: fit it into the box
+            // the photo occupied.
+            const scale = Math.min(
+                element.width / cutout.width,
+                element.height / cutout.height,
+            );
+            const width = Math.round(cutout.width * scale);
+            const height = Math.round(cutout.height * scale);
+
+            useEditorStore.getState().updateElement(element.id, {
+                assetId: cutout.id,
+                x: Math.round(element.x + (element.width - width) / 2),
+                y: Math.round(element.y + element.height - height),
+                width,
+                height,
+            });
+        } catch (error) {
+            toast.error(errorMessage(error));
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    return (
+        <div>
+            <button
+                type="button"
+                disabled={working}
+                onClick={() => void run()}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 p-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-60"
+            >
+                {working ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                ) : (
+                    <Eraser className="size-3.5" />
+                )}
+                {working ? 'Menghapus latar…' : 'Hapus latar foto'}
+            </button>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                Diproses di browser Anda; foto tidak dikirim ke pihak ketiga.
+                Pemakaian pertama mengunduh model ±25 MB.
+            </p>
+        </div>
+    );
+}
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
     return (
@@ -80,12 +169,19 @@ function ToggleButton({
     );
 }
 
-export function PropertiesPanel({ fonts }: { fonts: string[] }) {
+export function PropertiesPanel({
+    fonts,
+    projectId,
+}: {
+    fonts: string[];
+    projectId: number;
+}) {
     const element = useSelectedElement();
     const canvas = useEditorStore((state) => state.document.canvas);
     const updateElement = useEditorStore((state) => state.updateElement);
     const reorderElement = useEditorStore((state) => state.reorderElement);
     const setCanvas = useEditorStore((state) => state.setCanvas);
+    const accent = useEditorStore((state) => state.accent);
 
     if (!element) {
         return (
@@ -124,6 +220,11 @@ export function PropertiesPanel({ fonts }: { fonts: string[] }) {
 
     const hasText = element.type === 'text' || element.type === 'button';
 
+    // Keep the plain text in sync: it is what search, previews and the
+    // server-side layout read.
+    const setSpans = (spans: TextSpan[]): void =>
+        update({ spans, text: spans.map((span) => span.text).join(' ') });
+
     return (
         <>
             <div className="border-b border-slate-200 p-5">
@@ -139,17 +240,106 @@ export function PropertiesPanel({ fonts }: { fonts: string[] }) {
             <div className="space-y-4 p-5">
                 {hasText && (
                     <>
-                        <Field label="Teks">
-                            <textarea
-                                rows={3}
-                                value={element.text}
-                                maxLength={2000}
-                                onChange={(event) =>
-                                    update({ text: event.target.value })
-                                }
-                                className={inputClass}
-                            />
-                        </Field>
+                        {element.type === 'text' && element.spans?.length ? (
+                            <div className="space-y-2">
+                                <span className="text-xs font-semibold text-slate-500">
+                                    Teks per warna
+                                </span>
+                                {element.spans.map((span, index) => (
+                                    <div key={index} className="flex gap-2">
+                                        <input
+                                            value={span.text}
+                                            maxLength={500}
+                                            aria-label={`Teks bagian ${index + 1}`}
+                                            onChange={(event) =>
+                                                setSpans(
+                                                    element.spans?.map(
+                                                        (item, at) =>
+                                                            at === index
+                                                                ? {
+                                                                      ...item,
+                                                                      text: event
+                                                                          .target
+                                                                          .value,
+                                                                  }
+                                                                : item,
+                                                    ) ?? [],
+                                                )
+                                            }
+                                            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white p-2 text-sm"
+                                        />
+                                        <input
+                                            type="color"
+                                            value={span.fill}
+                                            aria-label={`Warna bagian ${index + 1}`}
+                                            onChange={(event) =>
+                                                setSpans(
+                                                    element.spans?.map(
+                                                        (item, at) =>
+                                                            at === index
+                                                                ? {
+                                                                      ...item,
+                                                                      fill: event
+                                                                          .target
+                                                                          .value,
+                                                                  }
+                                                                : item,
+                                                    ) ?? [],
+                                                )
+                                            }
+                                            className="h-9 w-10 shrink-0 rounded-lg border border-slate-200 bg-white p-1"
+                                        />
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => update({ spans: undefined })}
+                                    className="text-xs text-slate-500 underline"
+                                >
+                                    Jadikan satu warna
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <Field label="Teks">
+                                    <textarea
+                                        rows={3}
+                                        value={element.text}
+                                        maxLength={2000}
+                                        onChange={(event) =>
+                                            update({ text: event.target.value })
+                                        }
+                                        className={inputClass}
+                                    />
+                                </Field>
+                                {element.type === 'text' &&
+                                    element.text.trim().includes(' ') && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const words = element.text
+                                                    .trim()
+                                                    .split(/\s+/);
+                                                const last = words.pop() ?? '';
+
+                                                setSpans([
+                                                    {
+                                                        text: words.join(' '),
+                                                        fill: accent,
+                                                    },
+                                                    {
+                                                        text: last,
+                                                        fill: element.fill,
+                                                    },
+                                                ]);
+                                            }}
+                                            className="-mt-2 block text-xs text-slate-500 underline"
+                                        >
+                                            Bagi menjadi dua warna
+                                        </button>
+                                    )}
+                            </>
+                        )}
                         <Field label="Font">
                             <select
                                 value={element.fontFamily}
@@ -200,21 +390,28 @@ export function PropertiesPanel({ fonts }: { fonts: string[] }) {
                                 }
                             />
                         </div>
-                        <div className="flex gap-2">
-                            <ToggleButton
-                                active={element.fontStyle === 'bold'}
-                                label="Tebal"
-                                onClick={() =>
+                        <Field label="Ketebalan">
+                            <select
+                                value={element.fontStyle}
+                                onChange={(event) =>
                                     update({
-                                        fontStyle:
-                                            element.fontStyle === 'bold'
-                                                ? 'normal'
-                                                : 'bold',
+                                        fontStyle: event.target
+                                            .value as FontStyle,
                                     })
                                 }
+                                className={inputClass}
                             >
-                                <Bold className="size-4" />
-                            </ToggleButton>
+                                {FONT_STYLES.map((style) => (
+                                    <option
+                                        key={style.value}
+                                        value={style.value}
+                                    >
+                                        {style.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                        <div className="flex gap-2">
                             {element.type === 'text' &&
                                 ALIGNMENTS.map((alignment) => (
                                     <ToggleButton
@@ -232,6 +429,13 @@ export function PropertiesPanel({ fonts }: { fonts: string[] }) {
                                 ))}
                         </div>
                     </>
+                )}
+
+                {element.type === 'image' && (
+                    <RemoveBackgroundButton
+                        projectId={projectId}
+                        element={element}
+                    />
                 )}
 
                 {element.type !== 'text' && element.type !== 'image' && (
