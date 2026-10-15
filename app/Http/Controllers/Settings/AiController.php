@@ -44,16 +44,18 @@ class AiController extends Controller
 
     public function update(Request $request, GlobalAiSettings $settings): RedirectResponse
     {
+        $usesGemini = $request->input('layout_provider') === 'gemini' || $request->input('image_provider') === 'gemini';
+        $usesOpenAi = $request->input('layout_provider') === 'openai' || $request->input('image_provider') === 'openai';
         $data = $request->validate([
             'layout_provider' => ['required', Rule::in(['local', 'openai', 'gemini'])],
             'image_provider' => ['required', Rule::in(['local', 'openai', 'gemini'])],
-            'gemini_model' => ['required', 'string', 'max:120', 'regex:/^[a-zA-Z0-9._-]+$/'],
-            'gemini_image_model' => ['required', 'string', 'max:120', 'regex:/^[a-zA-Z0-9._-]+$/'],
-            'gemini_api_key' => ['nullable', 'string', 'max:500'],
-            'openai_api_key' => ['nullable', 'string', 'max:500'],
-            'openai_base_url' => ['required', 'url:http,https', 'max:500'],
-            'openai_layout_model' => ['required', 'string', 'max:120'],
-            'openai_image_model' => ['required', 'string', 'max:120'],
+            'gemini_model' => [Rule::excludeIf($request->input('layout_provider') !== 'gemini'), 'required', 'string', 'max:120', 'regex:/^[a-zA-Z0-9._-]+$/'],
+            'gemini_image_model' => [Rule::excludeIf($request->input('image_provider') !== 'gemini'), 'required', 'string', 'max:120', 'regex:/^[a-zA-Z0-9._-]+$/'],
+            'gemini_api_key' => [Rule::excludeIf(! $usesGemini), 'nullable', 'string', 'max:500'],
+            'openai_api_key' => [Rule::excludeIf(! $usesOpenAi), 'nullable', 'string', 'max:500'],
+            'openai_base_url' => [Rule::excludeIf(! $usesOpenAi), 'required', 'url:http,https', 'max:500'],
+            'openai_layout_model' => [Rule::excludeIf($request->input('layout_provider') !== 'openai'), 'required', 'string', 'max:120'],
+            'openai_image_model' => [Rule::excludeIf($request->input('image_provider') !== 'openai'), 'required', 'string', 'max:120'],
         ]);
 
         DB::transaction(function () use ($data, $settings) {

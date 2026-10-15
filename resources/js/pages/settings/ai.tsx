@@ -42,6 +42,23 @@ export default function Ai({ settings }: { settings: Settings }) {
         ['openai_api_key', 'API key OpenAI'],
     ] as const;
 
+    const activeProviders = (['gemini', 'openai'] as const).filter(
+        (provider) =>
+            form.data.layout_provider === provider ||
+            form.data.image_provider === provider,
+    );
+    const visibleFields = fields.filter(([field]) => {
+        if (field === 'gemini_model')
+            return form.data.layout_provider === 'gemini';
+        if (field === 'gemini_image_model')
+            return form.data.image_provider === 'gemini';
+        if (field === 'openai_layout_model')
+            return form.data.layout_provider === 'openai';
+        if (field === 'openai_image_model')
+            return form.data.image_provider === 'openai';
+        return activeProviders.some((provider) => field.startsWith(provider));
+    });
+
     return (
         <>
             <Head title="AI Global" />
@@ -94,11 +111,14 @@ export default function Ai({ settings }: { settings: Settings }) {
                             </div>
                         ),
                     )}
-                    <p className="text-sm text-muted-foreground">
-                        Gemini untuk teks dan gambar menggunakan API key yang
-                        sama. Pilih model teks dan model gambar secara terpisah.
-                    </p>
-                    {fields.map(([field, label]) => {
+                    {activeProviders.includes('gemini') && (
+                        <p className="text-sm text-muted-foreground">
+                            Gemini untuk teks dan gambar menggunakan API key
+                            yang sama. Pilih model teks dan model gambar secara
+                            terpisah.
+                        </p>
+                    )}
+                    {visibleFields.map(([field, label]) => {
                         const secret =
                             field === 'gemini_api_key' ||
                             field === 'openai_api_key';
@@ -139,56 +159,62 @@ export default function Ai({ settings }: { settings: Settings }) {
                             </div>
                         );
                     })}
-                    <a
-                        className="text-sm underline"
-                        href="https://aistudio.google.com/api-keys"
-                        target="_blank"
-                        rel="noreferrer"
-                    >
-                        Dapatkan API key di Google AI Studio
-                    </a>
-                    <div className="space-y-3">
-                        <h2 className="font-medium">Model yang tersedia</h2>
-                        <p className="text-sm text-muted-foreground">
-                            Daftar diambil langsung menggunakan API key dan Base
-                            URL yang sudah tersimpan. Jika baru mengubah
-                            keduanya, simpan konfigurasi terlebih dahulu. Pilih
-                            model untuk mengisi kolom model dan provider, lalu
-                            simpan untuk menerapkannya.
-                        </p>
-                        {(['gemini', 'openai'] as const).map((provider) => (
-                            <AiModelCatalog
-                                key={`${provider}-${catalogVersion}`}
-                                provider={provider}
-                                configured={
-                                    settings[`${provider}_api_key_configured`]
-                                }
-                                onSelect={(kind, id) => {
-                                    if (provider === 'gemini') {
-                                        form.setData(
-                                            kind === 'layout'
-                                                ? 'gemini_model'
-                                                : 'gemini_image_model',
-                                            id,
-                                        );
-                                    } else {
-                                        form.setData(
-                                            kind === 'layout'
-                                                ? 'openai_layout_model'
-                                                : 'openai_image_model',
-                                            id,
-                                        );
+                    {activeProviders.includes('gemini') && (
+                        <a
+                            className="text-sm underline"
+                            href="https://aistudio.google.com/api-keys"
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            Dapatkan API key di Google AI Studio
+                        </a>
+                    )}
+                    {activeProviders.length > 0 && (
+                        <div className="space-y-3">
+                            <h2 className="font-medium">Model yang tersedia</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Daftar diambil langsung menggunakan API key dan
+                                Base URL yang sudah tersimpan. Jika baru
+                                mengubah keduanya, simpan konfigurasi terlebih
+                                dahulu. Pilih model untuk mengisi kolom model
+                                dan provider, lalu simpan untuk menerapkannya.
+                            </p>
+                            {activeProviders.map((provider) => (
+                                <AiModelCatalog
+                                    key={`${provider}-${catalogVersion}`}
+                                    provider={provider}
+                                    configured={
+                                        settings[
+                                            `${provider}_api_key_configured`
+                                        ]
                                     }
-                                    form.setData(
-                                        kind === 'layout'
-                                            ? 'layout_provider'
-                                            : 'image_provider',
-                                        provider,
-                                    );
-                                }}
-                            />
-                        ))}
-                    </div>
+                                    onSelect={(kind, id) => {
+                                        if (provider === 'gemini') {
+                                            form.setData(
+                                                kind === 'layout'
+                                                    ? 'gemini_model'
+                                                    : 'gemini_image_model',
+                                                id,
+                                            );
+                                        } else {
+                                            form.setData(
+                                                kind === 'layout'
+                                                    ? 'openai_layout_model'
+                                                    : 'openai_image_model',
+                                                id,
+                                            );
+                                        }
+                                        form.setData(
+                                            kind === 'layout'
+                                                ? 'layout_provider'
+                                                : 'image_provider',
+                                            provider,
+                                        );
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
                     <div>
                         <Button disabled={form.processing}>
                             Simpan konfigurasi global

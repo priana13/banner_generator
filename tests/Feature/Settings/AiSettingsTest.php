@@ -160,3 +160,19 @@ test('Gemini errors distinguish unavailable models, invalid keys, and temporary 
     'temporary quota' => [['error' => ['message' => 'Quota exceeded, limit: 10, model: secret']], 429, 'kuota habis'],
     'busy' => [['error' => ['message' => 'high demand secret']], 503, 'sedang sibuk'],
 ]);
+
+test('inactive provider fields are ignored while saved configuration is retained', function () {
+    $this->actingAs(User::factory()->create());
+    AiSetting::create(['id' => 1, 'settings' => [
+        'openai_base_url' => 'https://example.com/v1', 'openai_layout_model' => 'saved-model',
+        'openai_api_key' => 'saved-secret',
+    ]]);
+    $this->put('/settings/ai', [
+        'layout_provider' => 'gemini', 'image_provider' => 'local',
+        'gemini_model' => 'gemini-test', 'gemini_api_key' => 'gemini-secret',
+        'openai_base_url' => 'invalid', 'openai_layout_model' => '', 'gemini_image_model' => '',
+        'openai_api_key' => 'replacement',
+    ])->assertSessionHasNoErrors()->assertRedirect('/settings/ai');
+    expect(AiSetting::find(1)->settings)
+        ->toMatchArray(['openai_base_url' => 'https://example.com/v1', 'openai_layout_model' => 'saved-model', 'openai_api_key' => 'saved-secret']);
+});
