@@ -425,6 +425,15 @@ export function GeneratorPanel({
                 composition={style}
                 maxPromptLength={maxPromptLength}
                 disabled={generation.busy}
+                onPresetSaved={(saved) => {
+                    setPresets((current) =>
+                        [
+                            ...current.filter((item) => item.id !== saved.id),
+                            saved,
+                        ].sort((a, b) => a.name.localeCompare(b.name)),
+                    );
+                }}
+                onRestore={applyBrief}
                 onApply={(value) => {
                     setPrompt(value);
                     setPresetId(null);

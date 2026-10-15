@@ -1,5 +1,7 @@
 import { Copy, LoaderCircle, Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import { PromptLibrary } from '@/components/editor/prompt-library';
+import type { PromptPreset } from '@/types';
 import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
 import { BANNER_COLOR_THEMES } from '@/lib/banner-color-themes';
@@ -21,6 +23,8 @@ type Props = {
     maxPromptLength: number;
     disabled: boolean;
     onApply: (prompt: string) => void;
+    onPresetSaved: (preset: PromptPreset) => void;
+    onRestore: (preset: PromptPreset) => void;
 };
 
 const fieldClass =
@@ -122,6 +126,41 @@ export function BannerPromptBuilder(props: Props) {
                     pengaturan AI Global. Ukuran, warna, dan gaya mengikuti
                     pengaturan editor saat prompt dibuat.
                 </DialogDescription>
+                <PromptLibrary
+                    prompt={result}
+                    settings={{
+                        primary_color: theme?.primary ?? props.color,
+                        style: props.composition,
+                        design_style: props.designStyle || null,
+                        builder: {
+                            concept,
+                            audience,
+                            headline,
+                            cta,
+                            visual,
+                            theme_id: themeId,
+                            layout: layout === 'left' ? 'left' : 'right',
+                            include_text: includeText,
+                        },
+                    }}
+                    disabled={generating || props.disabled}
+                    maxPromptLength={props.maxPromptLength}
+                    onSaved={props.onPresetSaved}
+                    onLoad={(preset) => {
+                        const values = preset.builder;
+                        setResult(preset.prompt);
+                        setConcept(values?.concept ?? '');
+                        setAudience(values?.audience ?? '');
+                        setHeadline(values?.headline ?? '');
+                        setCta(values?.cta ?? '');
+                        setVisual(values?.visual ?? '');
+                        setThemeId(values?.theme_id ?? '');
+                        setLayout(values?.layout ?? 'right');
+                        setIncludeText(values?.include_text ?? true);
+                        setError(null);
+                        props.onRestore(preset);
+                    }}
+                />
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();

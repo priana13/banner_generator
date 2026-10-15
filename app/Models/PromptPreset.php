@@ -32,6 +32,7 @@ class PromptPreset extends Model
             'primary_color' => $this->settings_json['primary_color'] ?? null,
             'style' => $this->settings_json['style'] ?? null,
             'design_style' => $this->settings_json['design_style'] ?? null,
+            'builder' => $this->settings_json['builder'] ?? null,
         ];
     }
 

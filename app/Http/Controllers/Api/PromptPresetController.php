@@ -32,7 +32,17 @@ class PromptPresetController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:80'],
+            'name' => ['required', 'string', 'max:80', ...($request->boolean('create_only') ? [Rule::unique('prompt_presets', 'name')->where('user_id', $request->user()->id)] : [])],
+            'create_only' => ['sometimes', 'boolean'],
+            'builder' => ['nullable', 'array:concept,audience,headline,cta,visual,theme_id,layout,include_text'],
+            'builder.concept' => ['nullable', 'string', 'max:1500'],
+            'builder.audience' => ['nullable', 'string', 'max:300'],
+            'builder.headline' => ['nullable', 'string', 'max:200'],
+            'builder.cta' => ['nullable', 'string', 'max:100'],
+            'builder.visual' => ['nullable', 'string', 'max:1000'],
+            'builder.theme_id' => ['nullable', 'string', 'max:80'],
+            'builder.layout' => ['nullable', 'in:left,right'],
+            'builder.include_text' => ['sometimes', 'boolean'],
             'prompt' => ['required', 'string', 'min:5', 'max:'.config()->integer('banner.max_prompt_length')],
             'primary_color' => ['nullable', 'string', 'regex:'.Color::HEX_PATTERN],
             'design_style' => ['nullable', 'string', Rule::in(array_column(app(DesignStyles::class)->available($request->user()), 'key'))],
@@ -40,7 +50,8 @@ class PromptPresetController extends Controller
         ]);
 
         $presets = $request->user()->promptPresets();
-        $exists = (clone $presets)->where('name', $data['name'])->exists();
+        $existing = (clone $presets)->where('name', $data['name'])->first();
+        $exists = $existing !== null;
 
         if (! $exists && $presets->count() >= config()->integer('banner.max_prompt_presets')) {
             return response()->json(['message' => 'Jumlah prompt tersimpan sudah mencapai batas.'], 422);
@@ -54,6 +65,7 @@ class PromptPresetController extends Controller
                     'primary_color' => $data['primary_color'] ?? null,
                     'style' => $data['style'] ?? null,
                     'design_style' => $data['design_style'] ?? null,
+                    'builder' => $data['builder'] ?? $existing?->settings_json['builder'] ?? null,
                 ],
             ],
         );

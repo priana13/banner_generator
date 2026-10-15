@@ -186,6 +186,16 @@ export type PromptPreset = {
     primary_color: string | null;
     style: BannerStyle | null;
     design_style: string | null;
+    builder?: {
+        concept?: string | null;
+        audience?: string | null;
+        headline?: string | null;
+        cta?: string | null;
+        visual?: string | null;
+        theme_id?: string | null;
+        layout?: 'left' | 'right' | null;
+        include_text?: boolean;
+    } | null;
 };
 
 export type ProjectCategory = {
