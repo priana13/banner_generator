@@ -20,6 +20,11 @@ class ImageLibrary
         return $this->store($user->id, (string) $file->getContent(), $file->getClientOriginalName(), $kind);
     }
 
+    public function generated(int $userId, string $binary, string $name): LibraryImage
+    {
+        return $this->store($userId, $binary, $name, Asset::KIND_UPLOAD);
+    }
+
     /** Keep an independent library copy, so deleting a project cannot remove it. */
     public function remember(Asset $asset): LibraryImage
     {

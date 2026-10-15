@@ -38,6 +38,9 @@ class GeminiImageProvider implements ImageProvider
             : 'Clean, professional marketing photo or illustration with a clear subject.';
         $prompt = "{$request->prompt}\n\nDesign style guidance: {$request->styleInstructions}\n\n{$style} Dominant color {$request->accentColor}. "
             .'Absolutely no text, letters, numbers, logos or visible watermarks.';
+        if ($request->purpose === ImageRequest::PURPOSE_BANNER) {
+            $prompt = "{$request->prompt}\nCreate a complete website banner. Target canvas {$request->width}x{$request->height}px. Follow the supplied palette and exact copy. Use {$request->accentColor} only as a fallback when no palette is specified. No watermarks.";
+        }
         $ratio = $request->width / $request->height;
 
         try {

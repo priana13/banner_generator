@@ -12,7 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import ImageLibraryPicker from '@/components/image-library-picker';
-import { BannerPromptBuilder } from '@/components/editor/banner-prompt-builder';
+import { Link } from '@inertiajs/react';
 import { useLibraryImage } from '@/lib/image-library';
 import { DesignStyleManager } from '@/components/editor/design-style-manager';
 import type { GenerationBrief } from '@/hooks/use-generation';
@@ -416,29 +416,12 @@ export function GeneratorPanel({
                 Jelaskan banner yang ingin Anda buat. Teks dan warna yang Anda
                 tulis persis akan dipakai apa adanya.
             </p>
-            <BannerPromptBuilder
-                projectId={projectId}
-                width={canvas.width}
-                height={canvas.height}
-                color={accent}
-                designStyle={designStyle}
-                composition={style}
-                maxPromptLength={maxPromptLength}
-                disabled={generation.busy}
-                onPresetSaved={(saved) => {
-                    setPresets((current) =>
-                        [
-                            ...current.filter((item) => item.id !== saved.id),
-                            saved,
-                        ].sort((a, b) => a.name.localeCompare(b.name)),
-                    );
-                }}
-                onRestore={applyBrief}
-                onApply={(value) => {
-                    setPrompt(value);
-                    setPresetId(null);
-                }}
-            />
+            <Link
+                href="/generate-prompt"
+                className="mb-3 block rounded-lg border border-orange-200 bg-orange-50 p-2 text-center text-xs font-semibold text-orange-700"
+            >
+                Buka Generate Prompt
+            </Link>
             <textarea
                 rows={6}
                 value={prompt}

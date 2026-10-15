@@ -20,6 +20,12 @@ class BannerPromptController extends Controller
     public function store(Request $request, Project $project): JsonResponse
     {
         Gate::authorize('update', $project);
+
+        return $this->generate($request);
+    }
+
+    public function generate(Request $request): JsonResponse
+    {
         $data = $request->validate([
             'concept' => ['required', 'string', 'max:1500'],
             'audience' => ['nullable', 'string', 'max:300'],

@@ -13,7 +13,7 @@ interface ImageProvider
     public function model(): string;
 
     /**
-     * Generate an image of exactly the requested size, without text or logos.
+     * Generate an image of exactly the requested size. Banner requests follow the supplied copy; visual and background requests omit text and logos.
      *
      * @throws AiProviderException
      */

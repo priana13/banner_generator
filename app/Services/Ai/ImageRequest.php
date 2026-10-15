@@ -8,6 +8,8 @@ final readonly class ImageRequest
 
     public const PURPOSE_VISUAL = 'visual';
 
+    public const PURPOSE_BANNER = 'banner';
+
     public function __construct(
         public string $prompt,
         public int $width,

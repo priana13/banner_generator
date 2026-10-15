@@ -74,6 +74,10 @@ class OpenAiImageProvider implements ImageProvider
 
     private function prompt(ImageRequest $request): string
     {
+        if ($request->purpose === ImageRequest::PURPOSE_BANNER) {
+            return "{$request->prompt}\nCreate a complete website banner. Target canvas {$request->width}x{$request->height}px. Follow the supplied palette and exact copy. Use {$request->accentColor} only as a fallback when no palette is specified. No watermarks.";
+        }
+
         $style = $request->purpose === ImageRequest::PURPOSE_BACKGROUND
             ? 'Soft, low-contrast abstract background with plenty of empty space.'
             : 'Clean, professional marketing photo or illustration with a clear subject.';

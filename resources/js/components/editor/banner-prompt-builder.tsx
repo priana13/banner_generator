@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/dialog';
 
 type Props = {
-    projectId: number;
+    projectId?: number;
+    inline?: boolean;
     width: number;
     height: number;
     color: string;
@@ -53,7 +54,9 @@ export function BannerPromptBuilder(props: Props) {
         try {
             const data = await api<{ prompt: string }>(
                 {
-                    url: `/api/projects/${props.projectId}/banner-prompt`,
+                    url: props.projectId
+                        ? `/api/projects/${props.projectId}/banner-prompt`
+                        : '/api/banner-prompt',
                     method: 'post',
                 },
                 {
@@ -99,6 +102,8 @@ export function BannerPromptBuilder(props: Props) {
         }
     };
 
+    const Container = props.inline ? 'section' : DialogContent;
+
     return (
         <Dialog
             open={open}
@@ -106,25 +111,31 @@ export function BannerPromptBuilder(props: Props) {
                 if (!generating) setOpen(value);
             }}
         >
-            <DialogTrigger asChild>
-                <button
-                    type="button"
-                    disabled={props.disabled}
-                    className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-2 text-xs font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
-                >
-                    <Sparkles className="size-3.5" />
-                    Buat prompt gambar banner
-                </button>
-            </DialogTrigger>
-            <DialogContent
-                className="max-h-[90vh] overflow-y-auto bg-white text-slate-800 sm:max-w-2xl"
+            {!props.inline && (
+                <DialogTrigger asChild>
+                    <button
+                        type="button"
+                        disabled={props.disabled}
+                        className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-2 text-xs font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+                    >
+                        <Sparkles className="size-3.5" />
+                        Buat prompt gambar banner
+                    </button>
+                </DialogTrigger>
+            )}
+            <Container
+                className={
+                    props.inline
+                        ? 'space-y-4 rounded-xl border border-slate-200 bg-white p-5 text-slate-800'
+                        : 'max-h-[90vh] overflow-y-auto bg-white text-slate-800 sm:max-w-2xl'
+                }
                 style={{ colorScheme: 'light' }}
             >
                 <DialogTitle>Pembuat prompt gambar banner web</DialogTitle>
                 <DialogDescription>
                     AI mengembangkan detail banner menggunakan model teks di
-                    pengaturan AI Global. Ukuran, warna, dan gaya mengikuti
-                    pengaturan editor saat prompt dibuat.
+                    pengaturan AI Global. Ukuran dan gaya mengikuti pengaturan
+                    yang dipilih. Tema warna akan digunakan jika dipilih.
                 </DialogDescription>
                 <PromptLibrary
                     prompt={result}
@@ -373,17 +384,21 @@ export function BannerPromptBuilder(props: Props) {
                                     props.onApply(result.trim());
                                     setOpen(false);
                                     toast.success(
-                                        'Prompt dimasukkan ke brief banner.',
+                                        props.inline
+                                            ? 'Prompt diteruskan ke Generate Image.'
+                                            : 'Prompt dimasukkan ke brief banner.',
                                     );
                                 }}
                                 className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
                             >
-                                Gunakan sebagai brief
+                                {props.inline
+                                    ? 'Lanjut ke Generate Image'
+                                    : 'Gunakan sebagai brief'}
                             </button>
                         </div>
                     </div>
                 )}
-            </DialogContent>
+            </Container>
         </Dialog>
     );
 }

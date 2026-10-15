@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Image, LayoutGrid } from 'lucide-react';
+import { Image, LayoutGrid, Sparkles, FileText } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -21,6 +21,8 @@ const mainNavItems: NavItem[] = [
         href: dashboard(),
         icon: LayoutGrid,
     },
+    { title: 'Generate Image', href: '/generate-image', icon: Sparkles },
+    { title: 'Generate Prompt', href: '/generate-prompt', icon: FileText },
     { title: 'Aset', href: '/assets', icon: Image },
 ];
 

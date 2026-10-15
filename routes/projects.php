@@ -10,11 +10,14 @@ use App\Http\Controllers\Api\ProjectCategoryController;
 use App\Http\Controllers\Api\ProjectController as ApiProjectController;
 use App\Http\Controllers\Api\PromptPresetController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\GeneratorController;
 use App\Http\Controllers\LibraryImageController;
 use App\Http\Controllers\ProjectController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('generate-prompt', [GeneratorController::class, 'prompt'])->name('generate-prompt');
+    Route::get('generate-image', [GeneratorController::class, 'image'])->name('generate-image');
     Route::get('dashboard', [ProjectController::class, 'index'])->name('dashboard');
     Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
     Route::get('assets', [LibraryImageController::class, 'page'])->name('asset-library.index');
@@ -26,6 +29,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // JSON endpoints used by the editor. They share the session guard and
     // CSRF protection of the web group; no API key ever reaches the browser.
     Route::prefix('api')->name('api.')->middleware('throttle:240,1')->group(function () {
+        Route::post('banner-prompt', [BannerPromptController::class, 'generate'])->middleware('throttle:generate')->name('banner-prompt');
+        Route::post('generate-image', [GeneratorController::class, 'generateImage'])->middleware('throttle:generate')->name('generate-image');
         Route::get('library-images', [LibraryImageController::class, 'index'])->name('library-images.index');
         Route::post('library-images', [LibraryImageController::class, 'store'])->name('library-images.store');
         Route::delete('library-images/{libraryImage}', [LibraryImageController::class, 'destroy'])->name('library-images.destroy');
