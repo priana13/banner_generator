@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AssetController as ApiAssetController;
+use App\Http\Controllers\Api\BannerPromptController;
 use App\Http\Controllers\Api\DesignStyleController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\GenerationController;
@@ -60,6 +61,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('projects/{project}/generate', [GenerationController::class, 'store'])
             ->middleware('throttle:generate')
             ->name('projects.generate');
+        Route::post('projects/{project}/banner-prompt', [BannerPromptController::class, 'store'])
+            ->middleware('throttle:generate')
+            ->name('projects.banner-prompt');
         Route::get('generation-jobs/{generationJob}', [GenerationController::class, 'show'])->name('generation-jobs.show');
         Route::post('generation-jobs/{generationJob}/cancel', [GenerationController::class, 'cancel'])->name('generation-jobs.cancel');
         Route::post('generation-jobs/{generationJob}/retry', [GenerationController::class, 'retry'])

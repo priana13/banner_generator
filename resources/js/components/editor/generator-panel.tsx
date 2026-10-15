@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import ImageLibraryPicker from '@/components/image-library-picker';
+import { BannerPromptBuilder } from '@/components/editor/banner-prompt-builder';
 import { useLibraryImage } from '@/lib/image-library';
 import { DesignStyleManager } from '@/components/editor/design-style-manager';
 import type { GenerationBrief } from '@/hooks/use-generation';
@@ -415,6 +416,20 @@ export function GeneratorPanel({
                 Jelaskan banner yang ingin Anda buat. Teks dan warna yang Anda
                 tulis persis akan dipakai apa adanya.
             </p>
+            <BannerPromptBuilder
+                projectId={projectId}
+                width={canvas.width}
+                height={canvas.height}
+                color={accent}
+                designStyle={designStyle}
+                composition={style}
+                maxPromptLength={maxPromptLength}
+                disabled={generation.busy}
+                onApply={(value) => {
+                    setPrompt(value);
+                    setPresetId(null);
+                }}
+            />
             <textarea
                 rows={6}
                 value={prompt}

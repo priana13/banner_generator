@@ -25,6 +25,11 @@ class GeminiLayoutProvider implements LayoutProvider
 
     public function generate(DesignBrief $brief): LayoutResult
     {
+        return $this->generateWithPrompt($brief, new DesignPrompt);
+    }
+
+    public function generateWithPrompt(DesignBrief $brief, DesignPrompt $prompt): LayoutResult
+    {
         $key = config('banner.gemini.api_key');
         if (! is_string($key) || $key === '') {
             throw new AiProviderException('GEMINI_API_KEY belum dikonfigurasi. Buka pengaturan AI Global.');
@@ -33,7 +38,6 @@ class GeminiLayoutProvider implements LayoutProvider
             throw new AiProviderException('Model Gemini tidak valid. Periksa pengaturan AI Global.');
         }
 
-        $prompt = new DesignPrompt;
         try {
             $response = Http::withHeaders(['x-goog-api-key' => $key])
                 ->acceptJson()->timeout(config()->integer('banner.gemini.timeout'))

@@ -8,6 +8,7 @@ use App\Services\Ai\DesignBrief;
 use App\Services\Ai\DesignPrompt;
 use App\Services\Ai\LayoutResult;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -25,6 +26,11 @@ class OpenAiLayoutProvider implements LayoutProvider
 
     public function generate(DesignBrief $brief): LayoutResult
     {
+        return $this->generateWithPrompt($brief, new DesignPrompt);
+    }
+
+    public function generateWithPrompt(DesignBrief $brief, DesignPrompt $prompt): LayoutResult
+    {
         $apiKey = config('banner.openai.api_key');
 
         if (! is_string($apiKey) || $apiKey === '') {
@@ -38,14 +44,14 @@ class OpenAiLayoutProvider implements LayoutProvider
         $payload = [
             'model' => $this->model(),
             'messages' => [
-                ['role' => 'system', 'content' => (new DesignPrompt)->instructions()],
-                ['role' => 'user', 'content' => (new DesignPrompt)->brief($brief)],
+                ['role' => 'system', 'content' => $prompt->instructions()],
+                ['role' => 'user', 'content' => $prompt->brief($brief)],
             ],
         ];
         $structured = [
             'response_format' => [
                 'type' => 'json_schema',
-                'json_schema' => ['name' => 'design_spec', 'strict' => true, 'schema' => (new DesignPrompt)->schema()],
+                'json_schema' => ['name' => 'design_spec', 'strict' => true, 'schema' => $prompt->schema()],
             ],
         ];
 
@@ -84,6 +90,7 @@ class OpenAiLayoutProvider implements LayoutProvider
                 $response->status() === 401 => 'Kredensial penyedia AI ditolak. Periksa API key di pengaturan AI Global.',
                 $response->status() === 402 => 'Saldo penyedia AI tidak mencukupi. Periksa saldo akun API Anda.',
                 $response->status() === 429 => 'Penyedia AI sedang membatasi permintaan. Coba lagi beberapa saat lagi.',
+                in_array($response->status(), [502, 503, 504], true) => 'Layanan atau model AI sementara tidak tersedia (HTTP '.$response->status().'). Percobaan ulang otomatis belum berhasil. Coba lagi sebentar atau pilih model teks lain di pengaturan AI Global.',
                 default => "Penyedia AI mengembalikan galat (HTTP {$response->status()}).",
             });
         }
@@ -109,6 +116,7 @@ class OpenAiLayoutProvider implements LayoutProvider
             403 => 'Periksa izin model dan pengaturan privasi akun OpenRouter.',
             404 => 'Periksa ID model, ketersediaan penyedia, dan pengaturan privasi OpenRouter.',
             429 => 'Batas permintaan tercapai. Coba lagi beberapa saat lagi.',
+            502, 503, 504 => 'Layanan atau model AI sementara tidak tersedia. Percobaan ulang otomatis belum berhasil. Coba lagi sebentar atau pilih model teks lain di pengaturan AI Global.',
             default => 'Periksa model layout dan pengaturan akun OpenRouter di AI Global.',
         };
 
@@ -133,6 +141,8 @@ class OpenAiLayoutProvider implements LayoutProvider
     {
         return Http::withToken($apiKey)
             ->timeout(config()->integer('banner.openai.timeout'))
+            ->retry(2, 500, fn (\Exception $error) => $error instanceof RequestException
+                && in_array($error->response->status(), [502, 503, 504], true), throw: false)
             ->acceptJson()
             ->post(rtrim(config()->string('banner.openai.base_url'), '/').'/chat/completions', $payload);
     }
