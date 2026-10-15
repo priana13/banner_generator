@@ -22,6 +22,8 @@ class BannerImagePrompt extends DesignPrompt
         Develop the concept into specific subjects, environment, lighting, composition, visual hierarchy,
         typography, palette and safe margins appropriate to the requested canvas and audience.
         Preserve supplied headline, CTA and colors exactly. Do not invent factual claims or statistics.
+        When color_theme is supplied, explicitly include all four hex colors and their roles in the
+        generated prompt: primary, background, accent, and text. Use this palette consistently.
         If text is disabled, explicitly prohibit all text, letters, numbers, buttons and logos, leaving
         negative space for copy to be added later. Otherwise suggest concise relevant copy when omitted.
         Include practical exclusions such as watermarks, visual clutter and distorted subjects.

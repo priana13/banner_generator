@@ -27,11 +27,16 @@ test('prompt uses saved global text provider and sends art direction to AI', fun
     Http::fake(['openrouter.ai/*' => Http::response([
         'choices' => [['message' => ['content' => json_encode(['prompt' => 'Banner hasil arahan AI.'])]]],
     ])]);
-    $this->postJson($this->endpoint, $this->input)->assertOk()->assertJsonPath('prompt', 'Banner hasil arahan AI.');
+    $this->postJson($this->endpoint, [...$this->input, 'color_theme' => [
+        'name' => 'Biru Profesional', 'primary' => '#2563eb', 'background' => '#eff6ff',
+        'accent' => '#38bdf8', 'text' => '#172554',
+    ]])->assertOk()->assertJsonPath('prompt', 'Banner hasil arahan AI.');
     Http::assertSent(fn ($request) => $request['model'] === 'test-model'
         && $request['modalities'] === ['text']
         && str_contains($request['messages'][0]['content'], 'art director')
-        && str_contains($request['messages'][1]['content'], 'Bantu Santri'));
+        && str_contains($request['messages'][1]['content'], 'Bantu Santri')
+        && str_contains($request['messages'][1]['content'], '#eff6ff')
+        && str_contains($request['messages'][1]['content'], 'Biru Profesional'));
 });
 
 test('prompt supports Gemini and no-text input', function () {

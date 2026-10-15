@@ -2,6 +2,7 @@ import { Copy, LoaderCircle, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
+import { BANNER_COLOR_THEMES } from '@/lib/banner-color-themes';
 import {
     Dialog,
     DialogContent,
@@ -32,6 +33,8 @@ export function BannerPromptBuilder(props: Props) {
     const [headline, setHeadline] = useState('');
     const [cta, setCta] = useState('');
     const [visual, setVisual] = useState('');
+    const [themeId, setThemeId] = useState('');
+    const theme = BANNER_COLOR_THEMES.find((item) => item.id === themeId);
     const [layout, setLayout] = useState('right');
     const [includeText, setIncludeText] = useState(true);
     const [result, setResult] = useState('');
@@ -60,7 +63,16 @@ export function BannerPromptBuilder(props: Props) {
                     composition: props.composition,
                     width: props.width,
                     height: props.height,
-                    color: props.color,
+                    color: theme?.primary ?? props.color,
+                    color_theme: theme
+                        ? {
+                              name: theme.name,
+                              primary: theme.primary,
+                              background: theme.background,
+                              accent: theme.accent,
+                              text: theme.text,
+                          }
+                        : null,
                     design_style: props.designStyle || null,
                 },
             );
@@ -157,6 +169,52 @@ export function BannerPromptBuilder(props: Props) {
                                 className={fieldClass}
                             />
                         </label>
+                        <label className="block text-xs font-semibold">
+                            Tema warna
+                            <select
+                                value={themeId}
+                                onChange={(event) =>
+                                    setThemeId(event.target.value)
+                                }
+                                className={fieldClass}
+                            >
+                                <option value="">
+                                    Ikuti warna utama editor
+                                </option>
+                                {BANNER_COLOR_THEMES.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        {theme && (
+                            <div
+                                className="grid grid-cols-4 gap-2"
+                                aria-label={`Palet ${theme.name}`}
+                            >
+                                {(
+                                    [
+                                        ['Utama', theme.primary],
+                                        ['Latar', theme.background],
+                                        ['Aksen', theme.accent],
+                                        ['Teks', theme.text],
+                                    ] as const
+                                ).map(([label, color]) => (
+                                    <div
+                                        key={label}
+                                        className="text-center text-[10px] text-slate-600"
+                                    >
+                                        <div
+                                            className="mb-1 h-7 rounded border border-slate-200"
+                                            style={{ backgroundColor: color }}
+                                        />
+                                        <div>{label}</div>
+                                        <div>{color}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <label className="block text-xs font-semibold">
                             Posisi visual
                             <select

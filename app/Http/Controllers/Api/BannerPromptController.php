@@ -32,6 +32,12 @@ class BannerPromptController extends Controller
             'width' => ['required', 'integer', 'between:50,4096'],
             'height' => ['required', 'integer', 'between:50,4096'],
             'color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'color_theme' => ['nullable', 'array:name,primary,background,accent,text'],
+            'color_theme.name' => ['required_with:color_theme', 'string', 'max:80'],
+            'color_theme.primary' => ['required_with:color_theme', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'color_theme.background' => ['required_with:color_theme', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'color_theme.accent' => ['required_with:color_theme', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'color_theme.text' => ['required_with:color_theme', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'design_style' => ['nullable', 'string', 'max:100'],
         ]);
         $style = app(DesignStyles::class)->snapshot($request->user(), $data['design_style'] ?? null);
